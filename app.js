@@ -1,4 +1,5 @@
-const MD_FILE = "PAN-NSP-Study-Guide.md";
+const MD_FILE = "https://raw.githubusercontent.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/main/PAN-NSP-Study-Guide.md";
+
 
 // Blueprint weights (probabilistic selection)
 const BLUEPRINT_DOMAINS = [
