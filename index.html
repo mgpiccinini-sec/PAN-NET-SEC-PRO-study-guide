@@ -56,4 +56,132 @@
       background: #ffffffdd;
       padding: 10px 14px;
       border-radius: 8px;
-      border: 1px solid
+      border: 1px solid #ccc;
+      backdrop-filter: blur(4px);
+    }
+
+    #timerBox {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: #ffffffdd;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      backdrop-filter: blur(4px);
+    }
+
+    .domain-stats-box {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 260px;
+      background: #ffffffdd;
+      border: 1px solid #ccc;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      backdrop-filter: blur(4px);
+    }
+
+    .domain-stats-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    .domain-stats-box .row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+
+    #setupError {
+      color: red;
+      margin-top: 20px;
+    }
+
+    .summary-card {
+      background: #fff;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-top: 20px;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- INITIAL LOADING VIEW -->
+  <div id="setupView">
+    <h1>PAN‑NSP Mock Exam</h1>
+    <p>Loading 60 random questions from the 120‑question study guide…</p>
+    <div id="setupError" class="hidden"></div>
+  </div>
+
+  <!-- TIMER -->
+  <div id="timerBox" class="hidden">
+    <strong>Time:</strong> <span id="timer">00:00</span>
+  </div>
+
+  <!-- MAIN EXAM VIEW -->
+  <div id="examView">
+    <h2>Question <span id="qIndex"></span> / <span id="qTotal"></span></h2>
+    <h4 id="qDomain"></h4>
+    <p id="qText"></p>
+
+    <form id="optionsForm"></form>
+
+    <button id="prevBtn">Previous</button>
+    <button id="nextBtn">Next</button>
+    <button id="revealBtn">Reveal Answer</button>
+
+    <div id="answerBox" class="hidden">
+      <strong>Correct Answer:</strong>
+      <div id="correctAnswer"></div>
+      <div id="explanation"></div>
+    </div>
+  </div>
+
+  <!-- SCORE BOX -->
+  <div id="scoreBox" class="hidden">
+    <strong>Score:</strong>
+    <div><span id="scoreRight">0</span> / <span id="scoreTotal">0</span></div>
+    <div id="scorePct">0%</div>
+  </div>
+
+  <!-- DOMAIN PERFORMANCE PANEL -->
+  <div id="domainStats" class="domain-stats-box hidden">
+    <h3>Domain Performance</h3>
+    <div id="domainStatsContent"></div>
+  </div>
+
+  <!-- FINAL SUMMARY PAGE -->
+  <div id="summaryView">
+    <h1>Exam Summary</h1>
+
+    <div class="summary-card">
+      <p><strong>Total Correct:</strong> <span id="sumCorrect"></span> / 60</p>
+      <p><strong>Percentage:</strong> <span id="sumPct"></span></p>
+      <p><strong>Total Time:</strong> <span id="sumTime"></span></p>
+    </div>
+
+    <h3>Domain Breakdown</h3>
+    <div id="summaryDomains"></div>
+
+    <button id="reviewBtn">Review Missed Questions</button>
+    <button id="restartBtn">Restart Exam</button>
+  </div>
+
+  <!-- REVIEW MISSED QUESTIONS PAGE -->
+  <div id="reviewView">
+    <h1>Review Missed Questions</h1>
+    <div id="reviewContainer"></div>
+    <button id="restartBtn2">Restart Exam</button>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
