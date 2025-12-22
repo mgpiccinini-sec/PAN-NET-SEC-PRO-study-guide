@@ -172,16 +172,41 @@ function buildExamBlueprintWeighted(count) {
     byBlueprint.get(d).push(q);
   }
 
+  // Only use blueprint domains that actually have questions
+  const activeDomains = BLUEPRINT_DOMAINS.filter(d => (byBlueprint.get(d.name) || []).length > 0);
+  if (activeDomains.length === 0) {
+    throw new Error("No questions mapped to blueprint domains. Check TOPIC_TO_BLUEPRINT mapping.");
+  }
+
   const result = [];
-  while (result.length < count) {
-    const picked = weightedPick(BLUEPRINT_DOMAINS).name;
+
+  // Hard stop to prevent a browser freeze
+  const maxAttempts = count * 200;
+
+  let attempts = 0;
+  while (result.length < count && attempts < maxAttempts) {
+    attempts += 1;
+
+    const picked = weightedPick(activeDomains).name;
     const pool = (byBlueprint.get(picked) || []).filter(q => !chosen.has(q.id));
+
     if (pool.length === 0) continue;
+
     const q = pool[Math.floor(Math.random() * pool.length)];
     chosen.add(q.id);
     result.push(q);
   }
+
+  if (result.length < count) {
+    throw new Error(
+      `Could only build ${result.length}/${count} questions. ` +
+      `Some blueprint domains ran out of available questions.`
+    );
+  }
+
   return result;
+}
+
 }
 
 function updateScoreUI() {
