@@ -1,6 +1,7 @@
 /* ------------------ GLOBALS ------------------ */
 
-const MD_FILE = "https://raw.githubusercontent.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/main/PAN-NSP-Study-Guide.md";
+const MD_FILE =
+  "https://raw.githubusercontent.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/main/PAN-NSP-Study-Guide.md";
 
 const el = (id) => document.getElementById(id);
 
@@ -37,7 +38,7 @@ function stopTimer() {
 
 function initDomainStats() {
   domainStats = {};
-  exam.forEach(q => {
+  exam.forEach((q) => {
     if (!domainStats[q.topic]) {
       domainStats[q.topic] = { total: 0, correct: 0 };
     }
@@ -50,7 +51,7 @@ function updateDomainStatsUI() {
   const box = el("domainStatsContent");
   box.innerHTML = "";
 
-  Object.keys(domainStats).forEach(topic => {
+  Object.keys(domainStats).forEach((topic) => {
     const d = domainStats[topic];
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
 
@@ -93,14 +94,14 @@ const TOPIC_TO_BLUEPRINT = {
   "App-ID": "NGFW and SASE Solution Functionality",
   "User-ID": "NGFW and SASE Solution Functionality",
   "Device-ID": "NGFW and SASE Solution Functionality",
-  "NGFW": "NGFW and SASE Solution Functionality",
+  NGFW: "NGFW and SASE Solution Functionality",
   "IoT Security": "Platform Solutions, Services and Tools",
-  "Panorama": "Platform Solutions, Services and Tools",
-  "SASE": "Connectivity and Security",
-  "GlobalProtect": "Connectivity and Security",
-  "NAT": "Connectivity and Security",
-  "Decryption": "Connectivity and Security",
-  "Network Security Fundamentals": "Network Security Fundamentals"
+  Panorama: "Platform Solutions, Services and Tools",
+  SASE: "Connectivity and Security",
+  GlobalProtect: "Connectivity and Security",
+  NAT: "Connectivity and Security",
+  Decryption: "Connectivity and Security",
+  "Network Security Fundamentals": "Network Security Fundamentals",
 };
 
 /* ------------------ PARSE QUESTIONS ------------------ */
@@ -126,21 +127,23 @@ function parseQuestions(md) {
     const ansMatch = b.body.match(/\*\*Answer:\*\*\s*([A-D])/i);
     const answerLetter = ansMatch ? ansMatch[1].toUpperCase() : null;
 
-    const optRe = /-\s*([A-D])\)\s+([\s\S]*?)(?=\n-\s*[A-D]\)|\n\*\*Answer:\*\*|$)/g;
+    const optRe =
+      /-\s*([A-D])\)\s+([\s\S]*?)(?=\n-\s*[A-D]\)|\n\*\*Answer:\*\*|$)/g;
     const options = [];
     let om;
 
     while ((om = optRe.exec(b.body)) !== null) {
       options.push({
         letter: om[1].toUpperCase(),
-        text: om[2].trim()
+        text: om[2].trim(),
       });
     }
 
     const firstOptIndex = b.body.search(/-\s*A\)\s+/i);
-    const questionText = firstOptIndex >= 0
-      ? b.body.slice(0, firstOptIndex).trim()
-      : b.body.trim();
+    const questionText =
+      firstOptIndex >= 0
+        ? b.body.slice(0, firstOptIndex).trim()
+        : b.body.trim();
 
     let explanation = "";
     if (ansMatch) {
@@ -149,7 +152,7 @@ function parseQuestions(md) {
 
     if (!questionText || options.length !== 4 || !answerLetter) continue;
 
-    const correctOpt = options.find(o => o.letter === answerLetter);
+    const correctOpt = options.find((o) => o.letter === answerLetter);
     if (!correctOpt) continue;
 
     questions.push({
@@ -161,7 +164,7 @@ function parseQuestions(md) {
       options,
       answerLetter,
       correctText: correctOpt.text,
-      explanation
+      explanation,
     });
   }
 
@@ -175,7 +178,8 @@ function renderQuestion() {
 
   el("qIndex").textContent = String(idx + 1);
   el("qTotal").textContent = String(exam.length);
-  el("qDomain").textContent = q.blueprintDomain + " (topic: " + q.topic + ")";
+  el("qDomain").textContent =
+    q.blueprintDomain + " (topic: " + q.topic + ")";
   el("qText").textContent = q.text;
 
   el("prevBtn").disabled = idx === 0;
@@ -201,11 +205,21 @@ function renderQuestion() {
     const inputId = q.id + "_" + letter;
 
     wrapper.innerHTML =
-      '<label for="' + inputId + '">' +
-        '<span class="letter">' + letter + ')</span>' +
-        '<input type="radio" name="opt_' + q.id + '" id="' + inputId + '" />' +
-        '<span>' + opt.text + '</span>' +
-      '</label>';
+      '<label for="' +
+      inputId +
+      '">' +
+      '<span class="letter">' +
+      letter +
+      ")</span>" +
+      '<input type="radio" name="opt_' +
+      q.id +
+      '" id="' +
+      inputId +
+      '" />' +
+      "<span>" +
+      opt.text +
+      "</span>" +
+      "</label>";
 
     const input = wrapper.querySelector("input");
     input.setAttribute("data-text", opt.text);
@@ -220,3 +234,201 @@ function renderQuestion() {
     });
 
     el("optionsForm").appendChild(wrapper);
+  });
+
+  if (q._revealed) showAnswer(true);
+}
+
+/* ------------------ SHOW ANSWER ------------------ */
+
+function showAnswer(noScroll) {
+  const q = exam[idx];
+  q._revealed = true;
+
+  const correctText = q.correctText;
+  el("answerBox").classList.remove("hidden");
+  el("correctAnswer").textContent = correctText;
+  el("explanation").textContent =
+    q.explanation || "No explanation provided.";
+
+  const optDivs = Array.from(
+    el("optionsForm").querySelectorAll(".option")
+  );
+  const pickedText = selected[q.id];
+
+  optDivs.forEach((div) => {
+    const input = div.querySelector("input");
+    const optText = input.getAttribute("data-text");
+
+    if (optText === correctText) {
+      div.classList.add("correct");
+    }
+    if (pickedText && optText === pickedText && pickedText !== correctText) {
+      div.classList.add("wrong");
+    }
+  });
+
+  if (!noScroll) {
+    el("answerBox").scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }
+}
+
+/* ------------------ SCORING ------------------ */
+
+function scoreCurrentIfNeeded() {
+  const q = exam[idx];
+  if (locked[q.id]) return;
+  locked[q.id] = true;
+
+  const pickedText = selected[q.id];
+  const isCorrect = pickedText && pickedText === q.correctText;
+
+  if (isCorrect) {
+    right++;
+    domainStats[q.topic].correct++;
+  } else {
+    missedQuestions.push(q);
+  }
+
+  updateScoreUI();
+  updateDomainStatsUI();
+
+  if (idx === exam.length - 1) finishExam();
+}
+
+function updateScoreUI() {
+  el("scoreRight").textContent = String(right);
+  el("scoreTotal").textContent = String(exam.length);
+  const pct = exam.length
+    ? Math.round((right / exam.length) * 100)
+    : 0;
+  el("scorePct").textContent = pct + "%";
+}
+
+/* ------------------ FINISH EXAM ------------------ */
+
+function finishExam() {
+  stopTimer();
+
+  el("examView").style.display = "none";
+  el("summaryView").style.display = "block";
+
+  el("sumCorrect").textContent = right;
+  el("sumPct").textContent = Math.round((right / 60) * 100) + "%";
+
+  const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+  const s = String(secondsElapsed % 60).padStart(2, "0");
+  el("sumTime").textContent = `${m}:${s}`;
+
+  const box = el("summaryDomains");
+  box.innerHTML = "";
+
+  Object.keys(domainStats).forEach((topic) => {
+    const d = domainStats[topic];
+    const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <strong>${topic}</strong>: ${d.correct}/${d.total} (${pct}%)
+    `;
+    box.appendChild(row);
+  });
+}
+
+/* ------------------ REVIEW MISSED QUESTIONS ------------------ */
+
+function showReview() {
+  el("summaryView").style.display = "none";
+  el("reviewView").style.display = "block";
+
+  const container = el("reviewContainer");
+  container.innerHTML = "";
+
+  missedQuestions.forEach((q) => {
+    const div = document.createElement("div");
+    div.style.marginBottom = "20px";
+    div.style.padding = "12px";
+    div.style.background = "#fff";
+    div.style.border = "1px solid #ccc";
+    div.style.borderRadius = "8px";
+
+    div.innerHTML = `
+      <h3>${q.text}</h3>
+      <p><strong>Correct Answer:</strong> ${q.correctText}</p>
+      <p>${q.explanation || ""}</p>
+    `;
+
+    container.appendChild(div);
+  });
+}
+
+/* ------------------ RESTART ------------------ */
+
+function restartExam() {
+  location.reload();
+}
+
+/* ------------------ START EXAM ------------------ */
+
+async function startExam() {
+  try {
+    const md = await loadMarkdown();
+    QUESTIONS = parseQuestions(md);
+
+    if (QUESTIONS.length !== 120) {
+      throw new Error(
+        "Expected 120 questions, but parsed " + QUESTIONS.length + "."
+      );
+    }
+
+    exam = QUESTIONS.slice(0, 60);
+
+    idx = 0;
+    right = 0;
+    locked = {};
+    selected = {};
+    missedQuestions = [];
+
+    el("setupView").style.display = "none";
+    el("examView").style.display = "block";
+    el("scoreBox").classList.remove("hidden");
+    el("domainStats").classList.remove("hidden");
+
+    initDomainStats();
+    updateScoreUI();
+    renderQuestion();
+    startTimer();
+  } catch (e) {
+    el("setupError").textContent = e.message;
+    el("setupError").classList.remove("hidden");
+  }
+}
+
+/* ------------------ BUTTONS ------------------ */
+
+el("prevBtn").addEventListener("click", () => {
+  if (idx === 0) return;
+  idx--;
+  renderQuestion();
+});
+
+el("nextBtn").addEventListener("click", () => {
+  scoreCurrentIfNeeded();
+  if (idx >= exam.length - 1) return;
+  idx++;
+  renderQuestion();
+});
+
+el("revealBtn").addEventListener("click", () => showAnswer(false));
+
+el("reviewBtn").addEventListener("click", showReview);
+el("restartBtn").addEventListener("click", restartExam);
+el("restartBtn2").addEventListener("click", restartExam);
+
+/* ------------------ INIT ------------------ */
+
+startExam();
