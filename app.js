@@ -11,6 +11,7 @@ let idx = 0;
 let right = 0;
 let locked = {};
 let selected = {};
+let flagged = {};
 let domainStats = {};
 let missedQuestions = [];
 let timerInterval = null;
@@ -189,6 +190,13 @@ function renderQuestion() {
   el("correctAnswer").textContent = "";
   el("explanation").textContent = "";
 
+  /* FLAG INDICATOR */
+  el("flagIndicator").textContent = flagged[q.id] ? "🚩 Flagged" : "";
+
+  /* PROGRESS BAR */
+  const pct = Math.round(((idx + 1) / exam.length) * 100);
+  el("progressInner").style.width = pct + "%";
+
   el("optionsForm").innerHTML = "";
   const pickedText = selected[q.id] || null;
 
@@ -313,8 +321,8 @@ function updateScoreUI() {
 function finishExam() {
   stopTimer();
 
-  el("examView").style.display = "none";
-  el("summaryView").style.display = "block";
+  el("examView").classList.add("hidden");
+  el("summaryView").classList.remove("hidden");
 
   el("sumCorrect").textContent = right;
   el("sumPct").textContent = Math.round((right / 60) * 100) + "%";
@@ -322,6 +330,8 @@ function finishExam() {
   const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
   const s = String(secondsElapsed % 60).padStart(2, "0");
   el("sumTime").textContent = `${m}:${s}`;
+
+  el("sumFlagged").textContent = Object.keys(flagged).length;
 
   const box = el("summaryDomains");
   box.innerHTML = "";
@@ -342,93 +352,17 @@ function finishExam() {
 /* ------------------ REVIEW MISSED QUESTIONS ------------------ */
 
 function showReview() {
-  el("summaryView").style.display = "none";
-  el("reviewView").style.display = "block";
+  el("summaryView").classList.add("hidden");
+  el("reviewView").classList.remove("hidden");
 
   const container = el("reviewContainer");
   container.innerHTML = "";
 
   missedQuestions.forEach((q) => {
     const div = document.createElement("div");
-    div.style.marginBottom = "20px";
-    div.style.padding = "12px";
-    div.style.background = "#fff";
-    div.style.border = "1px solid #ccc";
-    div.style.borderRadius = "8px";
-
     div.innerHTML = `
       <h3>${q.text}</h3>
       <p><strong>Correct Answer:</strong> ${q.correctText}</p>
       <p>${q.explanation || ""}</p>
     `;
-
     container.appendChild(div);
-  });
-}
-
-/* ------------------ RESTART ------------------ */
-
-function restartExam() {
-  location.reload();
-}
-
-/* ------------------ START EXAM ------------------ */
-
-async function startExam() {
-  try {
-    const md = await loadMarkdown();
-    QUESTIONS = parseQuestions(md);
-
-    if (QUESTIONS.length !== 120) {
-      throw new Error(
-        "Expected 120 questions, but parsed " + QUESTIONS.length + "."
-      );
-    }
-
-    exam = QUESTIONS.slice(0, 60);
-
-    idx = 0;
-    right = 0;
-    locked = {};
-    selected = {};
-    missedQuestions = [];
-
-    el("setupView").style.display = "none";
-    el("examView").style.display = "block";
-    el("scoreBox").classList.remove("hidden");
-    el("domainStats").classList.remove("hidden");
-
-    initDomainStats();
-    updateScoreUI();
-    renderQuestion();
-    startTimer();
-  } catch (e) {
-    el("setupError").textContent = e.message;
-    el("setupError").classList.remove("hidden");
-  }
-}
-
-/* ------------------ BUTTONS ------------------ */
-
-el("prevBtn").addEventListener("click", () => {
-  if (idx === 0) return;
-  idx--;
-  renderQuestion();
-});
-
-el("nextBtn").addEventListener("click", () => {
-  scoreCurrentIfNeeded();
-  if (idx >= exam.length - 1) return;
-  idx++;
-  renderQuestion();
-});
-
-el("revealBtn").addEventListener("click", () => showAnswer(false));
-
-el("reviewBtn").addEventListener("click", showReview);
-el("restartBtn").addEventListener("click", restartExam);
-el("restartBtn2").addEventListener("click", restartExam);
-
-/* ------------------ INIT ------------------ */
-
-startExam();
