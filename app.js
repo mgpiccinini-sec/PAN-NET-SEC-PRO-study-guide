@@ -1,6 +1,6 @@
 const MD_FILE = "PAN-NSP-Study-Guide.md";
 
-// Your blueprint weights (probabilistic selection)
+// Blueprint weights (probabilistic selection)
 const BLUEPRINT_DOMAINS = [
   { name: "Network Security Fundamentals", weight: 16 },
   { name: "NGFW and SASE Solution Functionality", weight: 18 },
@@ -10,7 +10,7 @@ const BLUEPRINT_DOMAINS = [
   { name: "Connectivity and Security", weight: 14 },
 ];
 
-// Topic blocks in your markdown -> blueprint domains (editable mapping)
+// Topic blocks in your markdown -> blueprint domains
 const TOPIC_TO_BLUEPRINT = {
   "App-ID": "NGFW and SASE Solution Functionality",
   "User-ID": "NGFW and SASE Solution Functionality",
@@ -27,7 +27,6 @@ const TOPIC_TO_BLUEPRINT = {
 
   "Network Security Fundamentals": "Network Security Fundamentals",
 };
-
 
 const el = (id) => document.getElementById(id);
 
@@ -56,9 +55,6 @@ const explanationEl = el("explanation");
 const scoreRightEl = el("scoreRight");
 const scoreTotalEl = el("scoreTotal");
 const scorePctEl = el("scorePct");
-
-
-
 
 let QUESTIONS = [];
 let exam = [];
@@ -100,64 +96,68 @@ async function loadMarkdown() {
   return await res.text();
 }
 
+/**
+ * Robust parser for your markdown, even when Q/A/options are on one line.
+ * Expected patterns in the file:
+ *   Q1. Question text ... - A ... - B ... - C ... - D ... Answer B
+ */
 function parseQuestions(md) {
-  const lines = md.split(/\r?\n/);
-  const questions = [];
-  let current = null;
-  
+  const text = md.replace(/\r\n/g, "\n");
 
-  const flush = () => {
-    if (!current) return;
-    if (current.options.length === 4 && current.answer) questions.push(current);
-    current = null;
-
-    console.log("Sample mapping:", QUESTIONS.slice(0,5).map(q => ({num:q.num, topic:q.topic, blueprint:q.blueprintDomain})));
-
-  };
-
-  for (const raw of lines) {
-    const line = raw.trim();
-
-    const qMatch = line.match(/^Q(\d+)\.\s*(.+)$/i);
-    if (qMatch) {
-      flush();
-      const num = Number(qMatch[1]);
-const topic = topicForQuestionNumber(num);
-
-current = {
-  id: `Q${num}`,
-  num,
-  topic,
-  blueprintDomain: TOPIC_TO_BLUEPRINT[topic] || "Unmapped",
-  text: qMatch[2].trim(),
-  options: [],
-  answer: null,
-  explanation: "",
-};
-
-      continue;
-    }
-
-    if (!current) continue;
-
-    const optMatch = line.match(/^-+\s*([A-D])\s*(.+)$/i);
-    if (optMatch) {
-      current.options.push({ letter: optMatch[1].toUpperCase(), text: optMatch[2].trim() });
-      continue;
-    }
-
-    const ansMatch = line.match(/^Answer\s+([A-D])$/i);
-    if (ansMatch) {
-      current.answer = ansMatch[1].toUpperCase();
-      continue;
-    }
-
-    if (current.answer && line && !line.startsWith("TITLE")) {
-      current.explanation += (current.explanation ? " " : "") + line;
-    }
+  // Grab each question chunk from "Qn." up to the next "Q(n+1)." or end of file
+  const blocks = [];
+  const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=\nQ\d+\.\s|$)/g;
+  let m;
+  while ((m = reBlock.exec(text)) !== null) {
+    blocks.push({ num: Number(m[1]), body: m[2].trim() });
   }
 
-  flush();
+  const questions = [];
+
+  for (const b of blocks) {
+    const num = b.num;
+    const topic = topicForQuestionNumber(num);
+    const blueprintDomain = blueprintForTopic(topic);
+
+    // Answer letter
+    const ansMatch = b.body.match(/\bAnswer\s+([A-D])\b/i);
+    const answer = ansMatch ? ansMatch[1].toUpperCase() : null;
+
+    // Options: "- A ... - B ... - C ... - D ..."
+    const optRe = /-\s*([A-D])\s+([\s\S]*?)(?=\s+-\s*[A-D]\s+|\s+Answer\s+[A-D]\b|$)/gi;
+    const options = [];
+    let om;
+    while ((om = optRe.exec(b.body)) !== null) {
+      options.push({ letter: om[1].toUpperCase(), text: om[2].trim() });
+    }
+
+    // Question text: from start until first option "- A"
+    const firstOptIndex = b.body.search(/-\s*A\s+/i);
+    const questionText = (firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex) : b.body).trim();
+
+    // Explanation: anything after "Answer X"
+    let explanation = "";
+    if (ansMatch) {
+      explanation = b.body.slice(ansMatch.index + ansMatch[0].length).trim();
+      // Strip obvious TITLE noise if present after answer
+      explanation = explanation.replace(/TITLE[\s\S]*$/i, "").trim();
+    }
+
+    // Validate
+    if (!questionText || options.length !== 4 || !answer) continue;
+
+    questions.push({
+      id: `Q${num}`,
+      num,
+      topic,
+      blueprintDomain,
+      text: questionText,
+      options,
+      answer,
+      explanation,
+    });
+  }
+
   return questions.sort((a, b) => a.num - b.num);
 }
 
@@ -171,34 +171,30 @@ function weightedPick(domains) {
   return domains[domains.length - 1];
 }
 
-function buildExamBlueprintWeighted(count) {
+function buildExamBlueprintWeighted(allQuestions, count) {
   const chosen = new Set();
   const byBlueprint = new Map();
 
-  for (const q of QUESTIONS) {
+  for (const q of allQuestions) {
     const d = q.blueprintDomain || "Unmapped";
     if (!byBlueprint.has(d)) byBlueprint.set(d, []);
     byBlueprint.get(d).push(q);
   }
 
-  // Only use blueprint domains that actually have questions
   const activeDomains = BLUEPRINT_DOMAINS.filter(d => (byBlueprint.get(d.name) || []).length > 0);
   if (activeDomains.length === 0) {
     throw new Error("No questions mapped to blueprint domains. Check TOPIC_TO_BLUEPRINT mapping.");
   }
 
   const result = [];
-
-  // Hard stop to prevent a browser freeze
-  const maxAttempts = count * 200;
-
+  const maxAttempts = count * 300; // extra-safe
   let attempts = 0;
+
   while (result.length < count && attempts < maxAttempts) {
     attempts += 1;
 
     const picked = weightedPick(activeDomains).name;
     const pool = (byBlueprint.get(picked) || []).filter(q => !chosen.has(q.id));
-
     if (pool.length === 0) continue;
 
     const q = pool[Math.floor(Math.random() * pool.length)];
@@ -253,6 +249,7 @@ function renderQuestion() {
         <span>${opt.text}</span>
       </label>
     `;
+
     wrapper.querySelector("input").addEventListener("change", (e) => {
       selected[q.id] = e.target.value;
     });
@@ -308,7 +305,14 @@ startBtn.addEventListener("click", async () => {
     const md = await loadMarkdown();
     QUESTIONS = parseQuestions(md);
 
-    exam = buildExamBlueprintWeighted(count);
+    console.log("Parsed questions:", QUESTIONS.length);
+    console.log("Blueprint counts:", QUESTIONS.reduce((m,q)=> (m[q.blueprintDomain]=(m[q.blueprintDomain]||0)+1, m), {}));
+
+    if (QUESTIONS.length === 0) {
+      throw new Error("Parsed 0 questions. Check the markdown format in PAN-NSP-Study-Guide.md.");
+    }
+
+    exam = buildExamBlueprintWeighted(QUESTIONS, count);
     idx = 0;
     right = 0;
     locked = {};
@@ -341,3 +345,4 @@ nextBtn.addEventListener("click", () => {
 });
 
 revealBtn.addEventListener("click", () => showAnswer(false));
+
