@@ -20,7 +20,6 @@ const TOPIC_TO_BLUEPRINT = {
   "IoT Security": "Platform Solutions, Services and Tools",
   "Panorama": "Platform Solutions, Services and Tools",
 
-  "Connectivity and Security": "Connectivity and Security",
   "SASE": "Connectivity and Security",
   "GlobalProtect": "Connectivity and Security",
   "NAT": "Connectivity and Security",
@@ -28,6 +27,7 @@ const TOPIC_TO_BLUEPRINT = {
 
   "Network Security Fundamentals": "Network Security Fundamentals",
 };
+
 
 const el = (id) => document.getElementById(id);
 
@@ -56,6 +56,11 @@ const explanationEl = el("explanation");
 const scoreRightEl = el("scoreRight");
 const scoreTotalEl = el("scoreTotal");
 const scorePctEl = el("scorePct");
+
+const topic = topicForQuestionNumber(num);
+current.topic = topic;
+current.blueprintDomain = TOPIC_TO_BLUEPRINT[topic] || "Unmapped";
+
 
 let QUESTIONS = [];
 let exam = [];
@@ -101,11 +106,15 @@ function parseQuestions(md) {
   const lines = md.split(/\r?\n/);
   const questions = [];
   let current = null;
+  
 
   const flush = () => {
     if (!current) return;
     if (current.options.length === 4 && current.answer) questions.push(current);
     current = null;
+
+    console.log("Sample mapping:", QUESTIONS.slice(0,5).map(q => ({num:q.num, topic:q.topic, blueprint:q.blueprintDomain})));
+
   };
 
   for (const raw of lines) {
