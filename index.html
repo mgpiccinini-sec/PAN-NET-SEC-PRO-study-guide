@@ -15,15 +15,13 @@
       margin-top: 80px;
     }
 
-    #examView {
+    #examView, #summaryView, #reviewView {
       max-width: 800px;
       margin: auto;
       display: none;
     }
 
-    .hidden {
-      display: none;
-    }
+    .hidden { display: none; }
 
     .option {
       padding: 8px;
@@ -58,81 +56,4 @@
       background: #ffffffdd;
       padding: 10px 14px;
       border-radius: 8px;
-      border: 1px solid #ccc;
-      backdrop-filter: blur(4px);
-    }
-
-    /* NEW: Domain Stats Panel */
-    .domain-stats-box {
-      position: fixed;
-      right: 20px;
-      bottom: 20px;
-      width: 260px;
-      background: #ffffffdd;
-      border: 1px solid #ccc;
-      padding: 12px;
-      border-radius: 8px;
-      font-size: 14px;
-      backdrop-filter: blur(4px);
-    }
-
-    .domain-stats-box h3 {
-      margin-top: 0;
-      font-size: 16px;
-      text-align: center;
-    }
-
-    .domain-stats-box .row {
-      display: flex;
-      justify-content: space-between;
-      margin: 4px 0;
-    }
-
-    #setupError {
-      color: red;
-      margin-top: 20px;
-    }
-  </style>
-</head>
-
-<body>
-
-  <div id="setupView">
-    <h1>PAN‑NSP Mock Exam</h1>
-    <p>Loading 60 random questions from the 120‑question study guide…</p>
-    <div id="setupError" class="hidden"></div>
-  </div>
-
-  <div id="examView">
-    <h2>Question <span id="qIndex"></span> / <span id="qTotal"></span></h2>
-    <h4 id="qDomain"></h4>
-    <p id="qText"></p>
-
-    <form id="optionsForm"></form>
-
-    <button id="prevBtn">Previous</button>
-    <button id="nextBtn">Next</button>
-    <button id="revealBtn">Reveal Answer</button>
-
-    <div id="answerBox" class="hidden">
-      <strong>Correct Answer:</strong>
-      <div id="correctAnswer"></div>
-      <div id="explanation"></div>
-    </div>
-  </div>
-
-  <div id="scoreBox" class="hidden">
-    <strong>Score:</strong>
-    <div><span id="scoreRight">0</span> / <span id="scoreTotal">0</span></div>
-    <div id="scorePct">0%</div>
-  </div>
-
-  <!-- NEW DOMAIN PANEL -->
-  <div id="domainStats" class="domain-stats-box">
-    <h3>Domain Performance</h3>
-    <div id="domainStatsContent"></div>
-  </div>
-
-  <script src="app.js"></script>
-</body>
-</html>
+      border: 1px solid
