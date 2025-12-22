@@ -37,6 +37,7 @@ function showError(msg) {
   setupError.textContent = msg;
   setupError.classList.remove("hidden");
 }
+
 function hideError() {
   setupError.classList.add("hidden");
   setupError.textContent = "";
@@ -44,7 +45,7 @@ function hideError() {
 
 async function loadMarkdown() {
   const res = await fetch(MD_FILE, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not load ${MD_FILE} (HTTP ${res.status}).`);
+  if (!res.ok) throw new Error("Could not load markdown file.");
   return await res.text();
 }
 
@@ -74,7 +75,7 @@ const TOPIC_TO_BLUEPRINT = {
   "GlobalProtect": "Connectivity and Security",
   "NAT": "Connectivity and Security",
   "Decryption": "Connectivity and Security",
-  "Network Security Fundamentals": "Network Security Fundamentals",
+  "Network Security Fundamentals": "Network Security Fundamentals"
 };
 
 function parseQuestions(md) {
@@ -82,6 +83,7 @@ function parseQuestions(md) {
   const blocks = [];
   const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=Q\d+\.\s|$)/g;
   let m;
+
   while ((m = reBlock.exec(text)) !== null) {
     blocks.push({ num: Number(m[1]), body: m[2].trim() });
   }
@@ -99,41 +101,41 @@ function parseQuestions(md) {
     const optRe = /-\s*([A-D])\s+([\s\S]*?)(?=\s+-\s*[A-D]\s+|\s+Answer\s+[A-D]\b|$)/gi;
     const options = [];
     let om;
+
     while ((om = optRe.exec(b.body)) !== null) {
       options.push({ letter: om[1].toUpperCase(), text: om[2].trim() });
     }
 
     const firstOptIndex = b.body.search(/-\s*A\s+/i);
-    const questionText = (firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex) : b.body).trim();
+    const questionText = firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex).trim() : b.body.trim();
 
     let explanation = "";
     if (ansMatch) {
       explanation = b.body.slice(ansMatch.index + ansMatch[0].length).trim();
-      explanation = explanation.replace(/TITLE[\s\S]*$/i, "").trim();
     }
 
     if (!questionText || options.length !== 4 || !answer) continue;
 
     questions.push({
-      id: `Q${num}`,
+      id: "Q" + num,
       num,
       topic,
       blueprintDomain,
       text: questionText,
       options,
       answer,
-      explanation,
+      explanation
     });
   }
 
-  return questions.sort(() => Math.random() - 0.5); // shuffle
+  return questions.sort(() => Math.random() - 0.5);
 }
 
 function updateScoreUI() {
   scoreRightEl.textContent = String(right);
   scoreTotalEl.textContent = String(exam.length);
   const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
-  scorePctEl.textContent = `${pct}%`;
+  scorePctEl.textContent = pct + "%";
 }
 
 function renderQuestion() {
@@ -141,7 +143,7 @@ function renderQuestion() {
 
   qIndex.textContent = String(idx + 1);
   qTotal.textContent = String(exam.length);
-  qDomain.textContent = `${q.blueprintDomain} (topic: ${q.topic})`;
+  qDomain.textContent = q.blueprintDomain + " (topic: " + q.topic + ")";
   qText.textContent = q.text;
 
   prevBtn.disabled = idx === 0;
@@ -158,14 +160,15 @@ function renderQuestion() {
     const wrapper = document.createElement("div");
     wrapper.className = "option";
 
-    const id = `${q.id}_${opt.letter}`;
-    wrapper.innerHTML = `
-      <label for="${id}">
-        <span class="letter">${opt.letter})</span>
-        <input type="radio" name="opt" id="${id}" value="${opt.letter}" ${picked === opt.letter ? "checked" : ""} />
-        <span>${opt.text}</span>
-      </label>
-    `;
+    const id = q.id + "_" + opt.letter;
+    wrapper.innerHTML =
+      '<label for="' + id + '">' +
+      '<span class="letter">' + opt.letter + ')</span>' +
+      '<input type="radio" name="opt" id="' + id + '" value="' + opt.letter + '"' +
+      (picked === opt.letter ? " checked" : "") +
+      ' />' +
+      '<span>' + opt.text + '</span>' +
+      '</label>';
 
     wrapper.querySelector("input").addEventListener("change", (e) => {
       selected[q.id] = e.target.value;
@@ -183,16 +186,18 @@ function showAnswer(noScroll) {
 
   answerBox.classList.remove("hidden");
   correctAnswerEl.textContent = q.answer;
-  explanationEl.textContent = q.explanation || "No explanation provided in the source file.";
+  explanationEl.textContent = q.explanation || "No explanation provided.";
 
-  const optDivs = [...optionsForm.querySelectorAll(".option")];
-  for (const div of optDivs) {
+  const optDivs = Array.from(optionsForm.querySelectorAll(".option"));
+  const picked = selected[q.id];
+
+  optDivs.forEach((div) => {
     const input = div.querySelector("input");
     const letter = input.value;
-    div.classList.toggle("correct", letter === q.answer);
-    const picked = selected[q.id];
-    div.classList.toggle("wrong", picked && letter === picked && picked !== q.answer);
-  }
+
+    if (letter === q.answer) div.classList.add("correct");
+    if (picked && letter === picked && picked !== q.answer) div.classList.add("wrong");
+  });
 
   if (!noScroll) answerBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
@@ -202,8 +207,8 @@ function scoreCurrentIfNeeded() {
   if (locked[q.id]) return;
   locked[q.id] = true;
 
-  const picked = selected[q.id] || null;
-  if (picked && picked === q.answer) right += 1;
+  const picked = selected[q.id];
+  if (picked && picked === q.answer) right++;
 
   updateScoreUI();
 }
@@ -213,6 +218,7 @@ async function startExam() {
   try {
     const md = await loadMarkdown();
     QUESTIONS = parseQuestions(md);
+
     if (QUESTIONS.length < 120) throw new Error("Not enough questions found.");
 
     exam = QUESTIONS.slice(0, 120);
@@ -228,14 +234,23 @@ async function startExam() {
     updateScoreUI();
     renderQuestion();
   } catch (e) {
-    console.error("Exam load error:", e);
-    showError(e.message || String(e));
+    showError(e.message);
   }
 }
 
 prevBtn.addEventListener("click", () => {
   if (idx === 0) return;
-  idx -= 1;
+  idx--;
   renderQuestion();
 });
 
+nextBtn.addEventListener("click", () => {
+  scoreCurrentIfNeeded();
+  if (idx >= exam.length - 1) return;
+  idx++;
+  renderQuestion();
+});
+
+revealBtn.addEventListener("click", () => showAnswer(false));
+
+startExam();
