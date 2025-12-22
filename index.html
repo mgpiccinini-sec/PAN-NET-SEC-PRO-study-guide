@@ -2,49 +2,135 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PAN-NSP Mock Exam</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>PAN‑NSP Mock Exam</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      background: #f5f5f5;
+    }
+
+    #setupView {
+      text-align: center;
+      margin-top: 80px;
+    }
+
+    #examView {
+      max-width: 800px;
+      margin: auto;
+      display: none;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .option {
+      padding: 8px;
+      margin: 6px 0;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+    }
+
+    .option.correct {
+      background: #d4f8d4;
+      border-color: #4caf50;
+    }
+
+    .option.wrong {
+      background: #ffd6d6;
+      border-color: #e53935;
+    }
+
+    #answerBox {
+      margin-top: 20px;
+      padding: 12px;
+      background: #fff;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    #scoreBox {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #ffffffdd;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      backdrop-filter: blur(4px);
+    }
+
+    /* NEW: Domain Stats Panel */
+    .domain-stats-box {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      width: 260px;
+      background: #ffffffdd;
+      border: 1px solid #ccc;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      backdrop-filter: blur(4px);
+    }
+
+    .domain-stats-box h3 {
+      margin-top: 0;
+      font-size: 16px;
+      text-align: center;
+    }
+
+    .domain-stats-box .row {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+    }
+
+    #setupError {
+      color: red;
+      margin-top: 20px;
+    }
+  </style>
 </head>
+
 <body>
-  <div class="topbar">
-    <div>
-      <div class="title">PAN-NSP Mock Exam</div>
-      <div class="subtitle">120-question blueprint-weighted practice</div>
-    </div>
-    <div class="scorebox" id="scoreBox">
-      <div class="scoreline"><span id="scoreRight">0</span> / <span id="scoreTotal">0</span></div>
-      <div class="scorepct" id="scorePct">0%</div>
+
+  <div id="setupView">
+    <h1>PAN‑NSP Mock Exam</h1>
+    <p>Loading 60 random questions from the 120‑question study guide…</p>
+    <div id="setupError" class="hidden"></div>
+  </div>
+
+  <div id="examView">
+    <h2>Question <span id="qIndex"></span> / <span id="qTotal"></span></h2>
+    <h4 id="qDomain"></h4>
+    <p id="qText"></p>
+
+    <form id="optionsForm"></form>
+
+    <button id="prevBtn">Previous</button>
+    <button id="nextBtn">Next</button>
+    <button id="revealBtn">Reveal Answer</button>
+
+    <div id="answerBox" class="hidden">
+      <strong>Correct Answer:</strong>
+      <div id="correctAnswer"></div>
+      <div id="explanation"></div>
     </div>
   </div>
 
-  <div class="container">
-    <div class="card" id="setupView">
-      <p>Loading 120 questions from <code>PAN-NSP-Study-Guide.md</code>...</p>
-      <div class="error hidden" id="setupError"></div>
-    </div>
+  <div id="scoreBox" class="hidden">
+    <strong>Score:</strong>
+    <div><span id="scoreRight">0</span> / <span id="scoreTotal">0</span></div>
+    <div id="scorePct">0%</div>
+  </div>
 
-    <div class="card hidden" id="examView">
-      <div class="qhead">
-        <div class="qmeta">
-          <div class="qnum">Question <span id="qIndex"></span> of <span id="qTotal"></span></div>
-          <div class="qdomain" id="qDomain"></div>
-        </div>
-        <div>
-          <button id="prevBtn">Previous</button>
-          <button id="nextBtn">Next</button>
-          <button class="primary" id="revealBtn">Reveal Answer</button>
-        </div>
-      </div>
-
-      <div class="qtext" id="qText"></div>
-      <form class="options" id="optionsForm"></form>
-
-      <div class="answerbox hidden" id="answerBox">
-        <div><strong>Correct Answer:</strong> <span id="correctAnswer"></span></div>
-        <div class="explain" id="explanation"></div>
-      </div>
-    </div>
+  <!-- NEW DOMAIN PANEL -->
+  <div id="domainStats" class="domain-stats-box">
+    <h3>Domain Performance</h3>
+    <div id="domainStatsContent"></div>
   </div>
 
   <script src="app.js"></script>
