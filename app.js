@@ -32,7 +32,10 @@ function startTimer() {
 }
 
 function stopTimer() {
-  clearInterval(timerInterval);
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
 }
 
 /* ------------------ DOMAIN STATS ------------------ */
@@ -183,20 +186,29 @@ function renderQuestion() {
     q.blueprintDomain + " (topic: " + q.topic + ")";
   el("qText").textContent = q.text;
 
+  // Buttons
   el("prevBtn").disabled = idx === 0;
-  el("nextBtn").disabled = idx === exam.length - 1;
 
+  // Next button text: "Next" or "Finish exam" on last question
+  if (idx === exam.length - 1) {
+    el("nextBtn").textContent = "Finish exam";
+  } else {
+    el("nextBtn").textContent = "Next";
+  }
+
+  // Reset answer box
   el("answerBox").classList.add("hidden");
   el("correctAnswer").textContent = "";
   el("explanation").textContent = "";
 
-  /* FLAG INDICATOR */
+  // Flag indicator
   el("flagIndicator").textContent = flagged[q.id] ? "🚩 Flagged" : "";
 
-  /* PROGRESS BAR */
+  // Progress bar
   const pct = Math.round(((idx + 1) / exam.length) * 100);
   el("progressInner").style.width = pct + "%";
 
+  // Options
   el("optionsForm").innerHTML = "";
   const pickedText = selected[q.id] || null;
 
@@ -303,8 +315,6 @@ function scoreCurrentIfNeeded() {
 
   updateScoreUI();
   updateDomainStatsUI();
-
-  if (idx === exam.length - 1) finishExam();
 }
 
 function updateScoreUI() {
@@ -325,7 +335,7 @@ function finishExam() {
   el("summaryView").classList.remove("hidden");
 
   el("sumCorrect").textContent = right;
-  el("sumPct").textContent = Math.round((right / 60) * 100) + "%";
+  el("sumPct").textContent = Math.round((right / exam.length) * 100) + "%";
 
   const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
   const s = String(secondsElapsed % 60).padStart(2, "0");
@@ -453,6 +463,7 @@ async function startExam() {
 
 /* ------------------ BUTTONS ------------------ */
 
+// Navigation
 el("prevBtn").addEventListener("click", () => {
   if (idx === 0) return;
   idx--;
@@ -460,18 +471,33 @@ el("prevBtn").addEventListener("click", () => {
 });
 
 el("nextBtn").addEventListener("click", () => {
+  // Always score current question when moving forward / finishing
   scoreCurrentIfNeeded();
-  if (idx >= exam.length - 1) return;
+
+  // If this is the last question, finish the exam
+  if (idx === exam.length - 1) {
+    finishExam();
+    return;
+  }
+
+  // Otherwise, move to next question
   idx++;
   renderQuestion();
 });
 
+// Actions
 el("revealBtn").addEventListener("click", () => showAnswer(false));
 el("flagBtn").addEventListener("click", toggleFlag);
 el("reviewBtn").addEventListener("click", showReview);
 el("restartBtn").addEventListener("click", restartExam);
 el("restartBtn2").addEventListener("click", restartExam);
 el("exportCsvBtn").addEventListener("click", exportCSV);
+
+// Optional restart button on initial screen (if present in HTML)
+const restartMainBtn = el("restartMainBtn");
+if (restartMainBtn) {
+  restartMainBtn.addEventListener("click", restartExam);
+}
 
 /* ------------------ INIT ------------------ */
 
