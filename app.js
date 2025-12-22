@@ -1,57 +1,53 @@
+/* ------------------ GLOBALS ------------------ */
+
 const MD_FILE = "https://raw.githubusercontent.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/main/PAN-NSP-Study-Guide.md";
 
 const el = (id) => document.getElementById(id);
-
-const setupView = el("setupView");
-const examView = el("examView");
-const scoreBox = el("scoreBox");
-
-const qIndex = el("qIndex");
-const qTotal = el("qTotal");
-const qDomain = el("qDomain");
-const qText = el("qText");
-const optionsForm = el("optionsForm");
-
-const prevBtn = el("prevBtn");
-const nextBtn = el("nextBtn");
-const revealBtn = el("revealBtn");
-
-const answerBox = el("answerBox");
-const correctAnswerEl = el("correctAnswer");
-const explanationEl = el("explanation");
-
-const scoreRightEl = el("scoreRight");
-const scoreTotalEl = el("scoreTotal");
-const scorePctEl = el("scorePct");
-
-const setupError = el("setupError");
 
 let QUESTIONS = [];
 let exam = [];
 let idx = 0;
 let right = 0;
 let locked = {};
-let selected = {}; // stores chosen answer TEXT per question id
+let selected = {};
+let domainStats = {};
+let missedQuestions = [];
+let timerInterval = null;
+let secondsElapsed = 0;
+
+/* ------------------ TIMER ------------------ */
+
+function startTimer() {
+  secondsElapsed = 0;
+  el("timerBox").classList.remove("hidden");
+
+  timerInterval = setInterval(() => {
+    secondsElapsed++;
+    const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
+    const s = String(secondsElapsed % 60).padStart(2, "0");
+    el("timer").textContent = `${m}:${s}`;
+  }, 1000);
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+}
 
 /* ------------------ DOMAIN STATS ------------------ */
 
-let domainStats = {};
-
 function initDomainStats() {
   domainStats = {};
-
   exam.forEach(q => {
     if (!domainStats[q.topic]) {
       domainStats[q.topic] = { total: 0, correct: 0 };
     }
     domainStats[q.topic].total++;
   });
-
   updateDomainStatsUI();
 }
 
 function updateDomainStatsUI() {
-  const box = document.getElementById("domainStatsContent");
+  const box = el("domainStatsContent");
   box.innerHTML = "";
 
   Object.keys(domainStats).forEach(topic => {
@@ -177,19 +173,19 @@ function parseQuestions(md) {
 function renderQuestion() {
   const q = exam[idx];
 
-  qIndex.textContent = String(idx + 1);
-  qTotal.textContent = String(exam.length);
-  qDomain.textContent = q.blueprintDomain + " (topic: " + q.topic + ")";
-  qText.textContent = q.text;
+  el("qIndex").textContent = String(idx + 1);
+  el("qTotal").textContent = String(exam.length);
+  el("qDomain").textContent = q.blueprintDomain + " (topic: " + q.topic + ")";
+  el("qText").textContent = q.text;
 
-  prevBtn.disabled = idx === 0;
-  nextBtn.disabled = idx === exam.length - 1;
+  el("prevBtn").disabled = idx === 0;
+  el("nextBtn").disabled = idx === exam.length - 1;
 
-  answerBox.classList.add("hidden");
-  correctAnswerEl.textContent = "";
-  explanationEl.textContent = "";
+  el("answerBox").classList.add("hidden");
+  el("correctAnswer").textContent = "";
+  el("explanation").textContent = "";
 
-  optionsForm.innerHTML = "";
+  el("optionsForm").innerHTML = "";
   const pickedText = selected[q.id] || null;
 
   if (!q._shuffledOptions) {
@@ -223,117 +219,4 @@ function renderQuestion() {
       selected[q.id] = chosenText;
     });
 
-    optionsForm.appendChild(wrapper);
-  });
-
-  if (q._revealed) showAnswer(true);
-}
-
-/* ------------------ SHOW ANSWER ------------------ */
-
-function showAnswer(noScroll) {
-  const q = exam[idx];
-  q._revealed = true;
-
-  const correctText = q.correctText;
-  answerBox.classList.remove("hidden");
-  correctAnswerEl.textContent = correctText;
-  explanationEl.textContent = q.explanation || "No explanation provided.";
-
-  const optDivs = Array.from(optionsForm.querySelectorAll(".option"));
-  const pickedText = selected[q.id];
-
-  optDivs.forEach((div) => {
-    const input = div.querySelector("input");
-    const optText = input.getAttribute("data-text");
-
-    if (optText === correctText) {
-      div.classList.add("correct");
-    }
-    if (pickedText && optText === pickedText && pickedText !== correctText) {
-      div.classList.add("wrong");
-    }
-  });
-
-  if (!noScroll) {
-    answerBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-}
-
-/* ------------------ SCORING ------------------ */
-
-function scoreCurrentIfNeeded() {
-  const q = exam[idx];
-  if (locked[q.id]) return;
-  locked[q.id] = true;
-
-  const pickedText = selected[q.id];
-  const isCorrect = pickedText && pickedText === q.correctText;
-
-  if (isCorrect) {
-    right++;
-    domainStats[q.topic].correct++;
-  }
-
-  updateScoreUI();
-  updateDomainStatsUI();
-}
-
-function updateScoreUI() {
-  scoreRightEl.textContent = String(right);
-  scoreTotalEl.textContent = String(exam.length);
-  const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
-  scorePctEl.textContent = pct + "%";
-}
-
-/* ------------------ START EXAM ------------------ */
-
-async function startExam() {
-  hideError();
-  try {
-    const md = await loadMarkdown();
-    QUESTIONS = parseQuestions(md);
-
-    if (QUESTIONS.length !== 120) {
-      throw new Error("Expected 120 questions, but parsed " + QUESTIONS.length + ".");
-    }
-
-    exam = QUESTIONS.slice(0, 60);
-
-    idx = 0;
-    right = 0;
-    locked = {};
-    selected = {};
-
-    setupView.classList.add("hidden");
-    examView.classList.remove("hidden");
-    scoreBox.classList.remove("hidden");
-
-    initDomainStats();
-
-    updateScoreUI();
-    renderQuestion();
-  } catch (e) {
-    showError(e.message);
-    console.error(e);
-  }
-}
-
-/* ------------------ BUTTONS ------------------ */
-
-prevBtn.addEventListener("click", () => {
-  if (idx === 0) return;
-  idx--;
-  renderQuestion();
-});
-
-nextBtn.addEventListener("click", () => {
-  scoreCurrentIfNeeded();
-  if (idx >= exam.length - 1) return;
-  idx++;
-  renderQuestion();
-});
-
-revealBtn.addEventListener("click", () => showAnswer(false));
-
-startExam();
+    el("optionsForm").appendChild(wrapper);
