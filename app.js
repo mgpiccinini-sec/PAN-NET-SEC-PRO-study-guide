@@ -366,3 +366,113 @@ function showReview() {
       <p>${q.explanation || ""}</p>
     `;
     container.appendChild(div);
+  });
+}
+
+/* ------------------ FLAG QUESTION ------------------ */
+
+function toggleFlag() {
+  const q = exam[idx];
+  flagged[q.id] = !flagged[q.id];
+  el("flagIndicator").textContent = flagged[q.id] ? "🚩 Flagged" : "";
+}
+
+/* ------------------ EXPORT CSV ------------------ */
+
+function exportCSV() {
+  let csv = "Question,Topic,Domain,Correct,YourAnswer,CorrectAnswer,Flagged\n";
+
+  exam.forEach((q) => {
+    const your = selected[q.id] || "";
+    const correct = q.correctText;
+    const isCorrect = your === correct ? "Yes" : "No";
+    const isFlagged = flagged[q.id] ? "Yes" : "No";
+
+    csv += `"${q.text.replace(/"/g, '""')}",` +
+           `"${q.topic}",` +
+           `"${q.blueprintDomain}",` +
+           `"${isCorrect}",` +
+           `"${your.replace(/"/g, '""')}",` +
+           `"${correct.replace(/"/g, '""')}",` +
+           `"${isFlagged}"\n`;
+  });
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "exam_results.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/* ------------------ RESTART ------------------ */
+
+function restartExam() {
+  location.reload();
+}
+
+/* ------------------ START EXAM ------------------ */
+
+async function startExam() {
+  try {
+    const md = await loadMarkdown();
+    QUESTIONS = parseQuestions(md);
+
+    if (QUESTIONS.length !== 120) {
+      throw new Error(
+        "Expected 120 questions, but parsed " + QUESTIONS.length + "."
+      );
+    }
+
+    exam = QUESTIONS.slice(0, 60);
+
+    idx = 0;
+    right = 0;
+    locked = {};
+    selected = {};
+    flagged = {};
+    missedQuestions = [];
+
+    el("setupView").classList.add("hidden");
+    el("examView").classList.remove("hidden");
+    el("scoreBox").classList.remove("hidden");
+    el("domainStats").classList.remove("hidden");
+
+    initDomainStats();
+    updateScoreUI();
+    renderQuestion();
+    startTimer();
+  } catch (e) {
+    el("setupError").textContent = e.message;
+    el("setupError").classList.remove("hidden");
+  }
+}
+
+/* ------------------ BUTTONS ------------------ */
+
+el("prevBtn").addEventListener("click", () => {
+  if (idx === 0) return;
+  idx--;
+  renderQuestion();
+});
+
+el("nextBtn").addEventListener("click", () => {
+  scoreCurrentIfNeeded();
+  if (idx >= exam.length - 1) return;
+  idx++;
+  renderQuestion();
+});
+
+el("revealBtn").addEventListener("click", () => showAnswer(false));
+el("flagBtn").addEventListener("click", toggleFlag);
+el("reviewBtn").addEventListener("click", showReview);
+el("restartBtn").addEventListener("click", restartExam);
+el("restartBtn2").addEventListener("click", restartExam);
+el("exportCsvBtn").addEventListener("click", exportCSV);
+
+/* ------------------ INIT ------------------ */
+
+startExam();
