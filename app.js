@@ -57,9 +57,7 @@ const scoreRightEl = el("scoreRight");
 const scoreTotalEl = el("scoreTotal");
 const scorePctEl = el("scorePct");
 
-const topic = topicForQuestionNumber(num);
-current.topic = topic;
-current.blueprintDomain = TOPIC_TO_BLUEPRINT[topic] || "Unmapped";
+
 
 
 let QUESTIONS = [];
@@ -124,17 +122,19 @@ function parseQuestions(md) {
     if (qMatch) {
       flush();
       const num = Number(qMatch[1]);
-      const topic = topicForQuestionNumber(num);
-      current = {
-        id: `Q${num}`,
-        num,
-        topic,
-        blueprintDomain: blueprintForTopic(topic),
-        text: qMatch[2].trim(),
-        options: [],
-        answer: null,
-        explanation: "",
-      };
+const topic = topicForQuestionNumber(num);
+
+current = {
+  id: `Q${num}`,
+  num,
+  topic,
+  blueprintDomain: TOPIC_TO_BLUEPRINT[topic] || "Unmapped",
+  text: qMatch[2].trim(),
+  options: [],
+  answer: null,
+  explanation: "",
+};
+
       continue;
     }
 
