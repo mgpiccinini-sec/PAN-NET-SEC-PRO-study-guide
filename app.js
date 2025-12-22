@@ -66,4 +66,176 @@ function topicForQuestionNumber(n) {
 const TOPIC_TO_BLUEPRINT = {
   "App-ID": "NGFW and SASE Solution Functionality",
   "User-ID": "NGFW and SASE Solution Functionality",
-  "Device-ID": "
+  "Device-ID": "NGFW and SASE Solution Functionality",
+  "NGFW": "NGFW and SASE Solution Functionality",
+  "IoT Security": "Platform Solutions, Services and Tools",
+  "Panorama": "Platform Solutions, Services and Tools",
+  "SASE": "Connectivity and Security",
+  "GlobalProtect": "Connectivity and Security",
+  "NAT": "Connectivity and Security",
+  "Decryption": "Connectivity and Security",
+  "Network Security Fundamentals": "Network Security Fundamentals",
+};
+
+function parseQuestions(md) {
+  const text = md.replace(/\r\n/g, "\n");
+  const blocks = [];
+  const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=Q\d+\.\s|$)/g;
+  let m;
+  while ((m = reBlock.exec(text)) !== null) {
+    blocks.push({ num: Number(m[1]), body: m[2].trim() });
+  }
+
+  const questions = [];
+
+  for (const b of blocks) {
+    const num = b.num;
+    const topic = topicForQuestionNumber(num);
+    const blueprintDomain = TOPIC_TO_BLUEPRINT[topic] || "Unmapped";
+
+    const ansMatch = b.body.match(/\bAnswer\s+([A-D])\b/i);
+    const answer = ansMatch ? ansMatch[1].toUpperCase() : null;
+
+    const optRe = /-\s*([A-D])\s+([\s\S]*?)(?=\s+-\s*[A-D]\s+|\s+Answer\s+[A-D]\b|$)/gi;
+    const options = [];
+    let om;
+    while ((om = optRe.exec(b.body)) !== null) {
+      options.push({ letter: om[1].toUpperCase(), text: om[2].trim() });
+    }
+
+    const firstOptIndex = b.body.search(/-\s*A\s+/i);
+    const questionText = (firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex) : b.body).trim();
+
+    let explanation = "";
+    if (ansMatch) {
+      explanation = b.body.slice(ansMatch.index + ansMatch[0].length).trim();
+      explanation = explanation.replace(/TITLE[\s\S]*$/i, "").trim();
+    }
+
+    if (!questionText || options.length !== 4 || !answer) continue;
+
+    questions.push({
+      id: `Q${num}`,
+      num,
+      topic,
+      blueprintDomain,
+      text: questionText,
+      options,
+      answer,
+      explanation,
+    });
+  }
+
+  return questions.sort(() => Math.random() - 0.5); // shuffle
+}
+
+function updateScoreUI() {
+  scoreRightEl.textContent = String(right);
+  scoreTotalEl.textContent = String(exam.length);
+  const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
+  scorePctEl.textContent = `${pct}%`;
+}
+
+function renderQuestion() {
+  const q = exam[idx];
+
+  qIndex.textContent = String(idx + 1);
+  qTotal.textContent = String(exam.length);
+  qDomain.textContent = `${q.blueprintDomain} (topic: ${q.topic})`;
+  qText.textContent = q.text;
+
+  prevBtn.disabled = idx === 0;
+  nextBtn.disabled = idx === exam.length - 1;
+
+  answerBox.classList.add("hidden");
+  correctAnswerEl.textContent = "";
+  explanationEl.textContent = "";
+
+  optionsForm.innerHTML = "";
+  const picked = selected[q.id] || null;
+
+  for (const opt of q.options) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "option";
+
+    const id = `${q.id}_${opt.letter}`;
+    wrapper.innerHTML = `
+      <label for="${id}">
+        <span class="letter">${opt.letter})</span>
+        <input type="radio" name="opt" id="${id}" value="${opt.letter}" ${picked === opt.letter ? "checked" : ""} />
+        <span>${opt.text}</span>
+      </label>
+    `;
+
+    wrapper.querySelector("input").addEventListener("change", (e) => {
+      selected[q.id] = e.target.value;
+    });
+
+    optionsForm.appendChild(wrapper);
+  }
+
+  if (q._revealed) showAnswer(true);
+}
+
+function showAnswer(noScroll) {
+  const q = exam[idx];
+  q._revealed = true;
+
+  answerBox.classList.remove("hidden");
+  correctAnswerEl.textContent = q.answer;
+  explanationEl.textContent = q.explanation || "No explanation provided in the source file.";
+
+  const optDivs = [...optionsForm.querySelectorAll(".option")];
+  for (const div of optDivs) {
+    const input = div.querySelector("input");
+    const letter = input.value;
+    div.classList.toggle("correct", letter === q.answer);
+    const picked = selected[q.id];
+    div.classList.toggle("wrong", picked && letter === picked && picked !== q.answer);
+  }
+
+  if (!noScroll) answerBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+
+function scoreCurrentIfNeeded() {
+  const q = exam[idx];
+  if (locked[q.id]) return;
+  locked[q.id] = true;
+
+  const picked = selected[q.id] || null;
+  if (picked && picked === q.answer) right += 1;
+
+  updateScoreUI();
+}
+
+async function startExam() {
+  hideError();
+  try {
+    const md = await loadMarkdown();
+    QUESTIONS = parseQuestions(md);
+    if (QUESTIONS.length < 120) throw new Error("Not enough questions found.");
+
+    exam = QUESTIONS.slice(0, 120);
+    idx = 0;
+    right = 0;
+    locked = {};
+    selected = {};
+
+    setupView.classList.add("hidden");
+    examView.classList.remove("hidden");
+    scoreBox.classList.remove("hidden");
+
+    updateScoreUI();
+    renderQuestion();
+  } catch (e) {
+    console.error("Exam load error:", e);
+    showError(e.message || String(e));
+  }
+}
+
+prevBtn.addEventListener("click", () => {
+  if (idx === 0) return;
+  idx -= 1;
+  renderQuestion();
+});
+
