@@ -3,90 +3,82 @@
 <head>
   <meta charset="UTF-8" />
   <title>PAN‑NSP Mock Exam</title>
+
   <style>
+    /* ------------------ GLOBAL DARK THEME ------------------ */
+
     body {
       font-family: Arial, sans-serif;
       margin: 20px;
-      background: #f5f5f5;
+      background: #121212;
+      color: #e0e0e0;
     }
 
-    #setupView {
-      text-align: center;
-      margin-top: 80px;
+    .card, .option, #answerBox, .summary-card, #reviewContainer > div {
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 12px;
     }
 
-    #examView, #summaryView, #reviewView {
-      max-width: 800px;
-      margin: auto;
-      display: none;
+    button {
+      background: #333;
+      color: #e0e0e0;
+      border: 1px solid #555;
+      padding: 8px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      margin-right: 6px;
+    }
+
+    button:hover {
+      background: #444;
     }
 
     .hidden { display: none; }
 
-    .option {
-      padding: 8px;
-      margin: 6px 0;
-      background: #fff;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-    }
+    /* ------------------ OPTION COLORS ------------------ */
 
     .option.correct {
-      background: #d4f8d4;
+      background: #1b3d1b;
       border-color: #4caf50;
     }
 
     .option.wrong {
-      background: #ffd6d6;
+      background: #3d1b1b;
       border-color: #e53935;
     }
 
-    #answerBox {
-      margin-top: 20px;
-      padding: 12px;
-      background: #fff;
-      border-radius: 6px;
-      border: 1px solid #ccc;
+    /* ------------------ FIXED PANELS ------------------ */
+
+    #scoreBox, #timerBox, #domainStats {
+      position: fixed;
+      background: #1e1e1ecc;
+      border: 1px solid #333;
+      padding: 10px 14px;
+      border-radius: 8px;
+      backdrop-filter: blur(4px);
     }
 
     #scoreBox {
-      position: fixed;
       top: 20px;
       right: 20px;
-      background: #ffffffdd;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      backdrop-filter: blur(4px);
     }
 
     #timerBox {
-      position: fixed;
       top: 20px;
       left: 20px;
-      background: #ffffffdd;
-      padding: 10px 14px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-      backdrop-filter: blur(4px);
     }
 
-    .domain-stats-box {
-      position: fixed;
+    #domainStats {
       right: 20px;
       bottom: 20px;
       width: 260px;
-      background: #ffffffdd;
-      border: 1px solid #ccc;
-      padding: 12px;
-      border-radius: 8px;
       font-size: 14px;
-      backdrop-filter: blur(4px);
     }
 
-    .domain-stats-box h3 {
+    #domainStats h3 {
       margin-top: 0;
-      font-size: 16px;
       text-align: center;
     }
 
@@ -96,16 +88,36 @@
       margin: 4px 0;
     }
 
-    #setupError {
-      color: red;
+    /* ------------------ PROGRESS BAR ------------------ */
+
+    #progressOuter {
+      width: 100%;
+      height: 8px;
+      background: #333;
+      border-radius: 4px;
+      margin-bottom: 12px;
+    }
+
+    #progressInner {
+      height: 100%;
+      width: 0%;
+      background: #4caf50;
+      border-radius: 4px;
+      transition: width 0.25s ease;
+    }
+
+    /* ------------------ SUMMARY & REVIEW ------------------ */
+
+    .summary-card {
       margin-top: 20px;
     }
 
-    .summary-card {
-      background: #fff;
-      padding: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
+    #reviewContainer > div {
+      margin-bottom: 20px;
+    }
+
+    #setupError {
+      color: #ff6b6b;
       margin-top: 20px;
     }
 
@@ -128,7 +140,15 @@
 
   <!-- MAIN EXAM VIEW -->
   <div id="examView">
-    <h2>Question <span id="qIndex"></span> / <span id="qTotal"></span></h2>
+
+    <!-- PROGRESS BAR -->
+    <div id="progressOuter"><div id="progressInner"></div></div>
+
+    <h2>
+      Question <span id="qIndex"></span> / <span id="qTotal"></span>
+      <span id="flagIndicator" style="color:#ff5252; margin-left:10px;"></span>
+    </h2>
+
     <h4 id="qDomain"></h4>
     <p id="qText"></p>
 
@@ -137,6 +157,7 @@
     <button id="prevBtn">Previous</button>
     <button id="nextBtn">Next</button>
     <button id="revealBtn">Reveal Answer</button>
+    <button id="flagBtn">Flag</button>
 
     <div id="answerBox" class="hidden">
       <strong>Correct Answer:</strong>
@@ -153,30 +174,32 @@
   </div>
 
   <!-- DOMAIN PERFORMANCE PANEL -->
-  <div id="domainStats" class="domain-stats-box hidden">
+  <div id="domainStats" class="hidden">
     <h3>Domain Performance</h3>
     <div id="domainStatsContent"></div>
   </div>
 
   <!-- FINAL SUMMARY PAGE -->
-  <div id="summaryView">
+  <div id="summaryView" class="hidden">
     <h1>Exam Summary</h1>
 
     <div class="summary-card">
       <p><strong>Total Correct:</strong> <span id="sumCorrect"></span> / 60</p>
       <p><strong>Percentage:</strong> <span id="sumPct"></span></p>
       <p><strong>Total Time:</strong> <span id="sumTime"></span></p>
+      <p><strong>Flagged Questions:</strong> <span id="sumFlagged"></span></p>
     </div>
 
     <h3>Domain Breakdown</h3>
     <div id="summaryDomains"></div>
 
+    <button id="exportCsvBtn">Export Results (CSV)</button>
     <button id="reviewBtn">Review Missed Questions</button>
     <button id="restartBtn">Restart Exam</button>
   </div>
 
   <!-- REVIEW MISSED QUESTIONS PAGE -->
-  <div id="reviewView">
+  <div id="reviewView" class="hidden">
     <h1>Review Missed Questions</h1>
     <div id="reviewContainer"></div>
     <button id="restartBtn2">Restart Exam</button>
