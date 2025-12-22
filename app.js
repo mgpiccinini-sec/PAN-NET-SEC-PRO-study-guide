@@ -97,16 +97,15 @@ async function loadMarkdown() {
 }
 
 /**
- * Robust parser for your markdown, even when Q/A/options are on one line.
- * Expected patterns in the file:
- *   Q1. Question text ... - A ... - B ... - C ... - D ... Answer B
+ * Parser that works even if questions are on the same line:
+ * ... Q1. ... Answer B Q2. ... Answer C ...
  */
 function parseQuestions(md) {
   const text = md.replace(/\r\n/g, "\n");
 
-  // Grab each question chunk from "Qn." up to the next "Q(n+1)." or end of file
+  // IMPORTANT: do NOT require "\nQ" — match Qn. anywhere.
   const blocks = [];
-  const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=\nQ\d+\.\s|$)/g;
+  const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=Q\d+\.\s|$)/g;
   let m;
   while ((m = reBlock.exec(text)) !== null) {
     blocks.push({ num: Number(m[1]), body: m[2].trim() });
@@ -119,11 +118,9 @@ function parseQuestions(md) {
     const topic = topicForQuestionNumber(num);
     const blueprintDomain = blueprintForTopic(topic);
 
-    // Answer letter
     const ansMatch = b.body.match(/\bAnswer\s+([A-D])\b/i);
     const answer = ansMatch ? ansMatch[1].toUpperCase() : null;
 
-    // Options: "- A ... - B ... - C ... - D ..."
     const optRe = /-\s*([A-D])\s+([\s\S]*?)(?=\s+-\s*[A-D]\s+|\s+Answer\s+[A-D]\b|$)/gi;
     const options = [];
     let om;
@@ -131,19 +128,15 @@ function parseQuestions(md) {
       options.push({ letter: om[1].toUpperCase(), text: om[2].trim() });
     }
 
-    // Question text: from start until first option "- A"
     const firstOptIndex = b.body.search(/-\s*A\s+/i);
     const questionText = (firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex) : b.body).trim();
 
-    // Explanation: anything after "Answer X"
     let explanation = "";
     if (ansMatch) {
       explanation = b.body.slice(ansMatch.index + ansMatch[0].length).trim();
-      // Strip obvious TITLE noise if present after answer
       explanation = explanation.replace(/TITLE[\s\S]*$/i, "").trim();
     }
 
-    // Validate
     if (!questionText || options.length !== 4 || !answer) continue;
 
     questions.push({
@@ -187,7 +180,7 @@ function buildExamBlueprintWeighted(allQuestions, count) {
   }
 
   const result = [];
-  const maxAttempts = count * 300; // extra-safe
+  const maxAttempts = count * 300;
   let attempts = 0;
 
   while (result.length < count && attempts < maxAttempts) {
@@ -345,4 +338,3 @@ nextBtn.addEventListener("click", () => {
 });
 
 revealBtn.addEventListener("click", () => showAnswer(false));
-
