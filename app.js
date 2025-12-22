@@ -31,23 +31,52 @@ let exam = [];
 let idx = 0;
 let right = 0;
 let locked = {};
-let selected = {};
+let selected = {}; // stores chosen answer TEXT per question id
 
-function showError(msg) {
-  setupError.textContent = msg;
-  setupError.classList.remove("hidden");
+/* ------------------ DOMAIN STATS ------------------ */
+
+let domainStats = {};
+
+function initDomainStats() {
+  domainStats = {};
+
+  exam.forEach(q => {
+    if (!domainStats[q.topic]) {
+      domainStats[q.topic] = { total: 0, correct: 0 };
+    }
+    domainStats[q.topic].total++;
+  });
+
+  updateDomainStatsUI();
 }
 
-function hideError() {
-  setupError.classList.add("hidden");
-  setupError.textContent = "";
+function updateDomainStatsUI() {
+  const box = document.getElementById("domainStatsContent");
+  box.innerHTML = "";
+
+  Object.keys(domainStats).forEach(topic => {
+    const d = domainStats[topic];
+    const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
+
+    const row = document.createElement("div");
+    row.className = "row";
+    row.innerHTML = `
+      <span>${topic}</span>
+      <span>${d.correct}/${d.total} (${pct}%)</span>
+    `;
+    box.appendChild(row);
+  });
 }
+
+/* ------------------ LOAD MARKDOWN ------------------ */
 
 async function loadMarkdown() {
   const res = await fetch(MD_FILE, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load markdown file.");
   return await res.text();
 }
+
+/* ------------------ TOPIC MAPPING ------------------ */
 
 function topicForQuestionNumber(n) {
   if (n >= 1 && n <= 12) return "App-ID";
@@ -78,10 +107,11 @@ const TOPIC_TO_BLUEPRINT = {
   "Network Security Fundamentals": "Network Security Fundamentals"
 };
 
+/* ------------------ PARSE QUESTIONS ------------------ */
+
 function parseQuestions(md) {
   const text = md.replace(/\r\n/g, "\n");
 
-  // Match **Q1.**, **Q2.**, etc.
   const blocks = [];
   const reBlock = /\*\*Q(\d+)\.\*\*\s*([\s\S]*?)(?=(\*\*Q\d+\.\*\*)|$)/g;
   let m;
@@ -97,11 +127,9 @@ function parseQuestions(md) {
     const topic = topicForQuestionNumber(num);
     const blueprintDomain = TOPIC_TO_BLUEPRINT[topic] || "Unmapped";
 
-    // Match **Answer:** B
     const ansMatch = b.body.match(/\*\*Answer:\*\*\s*([A-D])/i);
-    const answer = ansMatch ? ansMatch[1].toUpperCase() : null;
+    const answerLetter = ansMatch ? ansMatch[1].toUpperCase() : null;
 
-    // Match - A) Option text
     const optRe = /-\s*([A-D])\)\s+([\s\S]*?)(?=\n-\s*[A-D]\)|\n\*\*Answer:\*\*|$)/g;
     const options = [];
     let om;
@@ -123,7 +151,10 @@ function parseQuestions(md) {
       explanation = b.body.slice(ansMatch.index + ansMatch[0].length).trim();
     }
 
-    if (!questionText || options.length !== 4 || !answer) continue;
+    if (!questionText || options.length !== 4 || !answerLetter) continue;
+
+    const correctOpt = options.find(o => o.letter === answerLetter);
+    if (!correctOpt) continue;
 
     questions.push({
       id: "Q" + num,
@@ -132,7 +163,8 @@ function parseQuestions(md) {
       blueprintDomain,
       text: questionText,
       options,
-      answer,
+      answerLetter,
+      correctText: correctOpt.text,
       explanation
     });
   }
@@ -140,12 +172,7 @@ function parseQuestions(md) {
   return questions.sort(() => Math.random() - 0.5);
 }
 
-function updateScoreUI() {
-  scoreRightEl.textContent = String(right);
-  scoreTotalEl.textContent = String(exam.length);
-  const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
-  scorePctEl.textContent = pct + "%";
-}
+/* ------------------ RENDER QUESTION ------------------ */
 
 function renderQuestion() {
   const q = exam[idx];
@@ -163,64 +190,103 @@ function renderQuestion() {
   explanationEl.textContent = "";
 
   optionsForm.innerHTML = "";
-  const picked = selected[q.id] || null;
+  const pickedText = selected[q.id] || null;
 
-  for (const opt of q.options) {
+  if (!q._shuffledOptions) {
+    q._shuffledOptions = q.options.slice().sort(() => Math.random() - 0.5);
+  }
+  const optionsToRender = q._shuffledOptions;
+
+  optionsToRender.forEach((opt, index) => {
     const wrapper = document.createElement("div");
     wrapper.className = "option";
 
-    const id = q.id + "_" + opt.letter;
+    const letter = String.fromCharCode(65 + index);
+    const inputId = q.id + "_" + letter;
+
     wrapper.innerHTML =
-      '<label for="' + id + '">' +
-      '<span class="letter">' + opt.letter + ')</span>' +
-      '<input type="radio" name="opt" id="' + id + '" value="' + opt.letter + '"' +
-      (picked === opt.letter ? " checked" : "") +
-      ' />' +
-      '<span>' + opt.text + '</span>' +
+      '<label for="' + inputId + '">' +
+        '<span class="letter">' + letter + ')</span>' +
+        '<input type="radio" name="opt_' + q.id + '" id="' + inputId + '" />' +
+        '<span>' + opt.text + '</span>' +
       '</label>';
 
-    wrapper.querySelector("input").addEventListener("change", (e) => {
-      selected[q.id] = e.target.value;
+    const input = wrapper.querySelector("input");
+    input.setAttribute("data-text", opt.text);
+
+    if (pickedText && pickedText === opt.text) {
+      input.checked = true;
+    }
+
+    input.addEventListener("change", (e) => {
+      const chosenText = e.target.getAttribute("data-text");
+      selected[q.id] = chosenText;
     });
 
     optionsForm.appendChild(wrapper);
-  }
+  });
 
   if (q._revealed) showAnswer(true);
 }
+
+/* ------------------ SHOW ANSWER ------------------ */
 
 function showAnswer(noScroll) {
   const q = exam[idx];
   q._revealed = true;
 
+  const correctText = q.correctText;
   answerBox.classList.remove("hidden");
-  correctAnswerEl.textContent = q.answer;
+  correctAnswerEl.textContent = correctText;
   explanationEl.textContent = q.explanation || "No explanation provided.";
 
   const optDivs = Array.from(optionsForm.querySelectorAll(".option"));
-  const picked = selected[q.id];
+  const pickedText = selected[q.id];
 
   optDivs.forEach((div) => {
     const input = div.querySelector("input");
-    const letter = input.value;
+    const optText = input.getAttribute("data-text");
 
-    if (letter === q.answer) div.classList.add("correct");
-    if (picked && letter === picked && picked !== q.answer) div.classList.add("wrong");
+    if (optText === correctText) {
+      div.classList.add("correct");
+    }
+    if (pickedText && optText === pickedText && pickedText !== correctText) {
+      div.classList.add("wrong");
+    }
   });
 
-  if (!noScroll) answerBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  if (!noScroll) {
+    answerBox.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
 }
+
+/* ------------------ SCORING ------------------ */
 
 function scoreCurrentIfNeeded() {
   const q = exam[idx];
   if (locked[q.id]) return;
   locked[q.id] = true;
 
-  const picked = selected[q.id];
-  if (picked && picked === q.answer) right++;
+  const pickedText = selected[q.id];
+  const isCorrect = pickedText && pickedText === q.correctText;
+
+  if (isCorrect) {
+    right++;
+    domainStats[q.topic].correct++;
+  }
 
   updateScoreUI();
+  updateDomainStatsUI();
 }
+
+function updateScoreUI() {
+  scoreRightEl.textContent = String(right);
+  scoreTotalEl.textContent = String(exam.length);
+  const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
+  scorePctEl.textContent = pct + "%";
+}
+
+/* ------------------ START EXAM ------------------ */
 
 async function startExam() {
   hideError();
@@ -232,7 +298,8 @@ async function startExam() {
       throw new Error("Expected 120 questions, but parsed " + QUESTIONS.length + ".");
     }
 
-    exam = QUESTIONS;
+    exam = QUESTIONS.slice(0, 60);
+
     idx = 0;
     right = 0;
     locked = {};
@@ -242,6 +309,8 @@ async function startExam() {
     examView.classList.remove("hidden");
     scoreBox.classList.remove("hidden");
 
+    initDomainStats();
+
     updateScoreUI();
     renderQuestion();
   } catch (e) {
@@ -249,6 +318,8 @@ async function startExam() {
     console.error(e);
   }
 }
+
+/* ------------------ BUTTONS ------------------ */
 
 prevBtn.addEventListener("click", () => {
   if (idx === 0) return;
