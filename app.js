@@ -80,8 +80,10 @@ const TOPIC_TO_BLUEPRINT = {
 
 function parseQuestions(md) {
   const text = md.replace(/\r\n/g, "\n");
+
+  // Match **Q1.**, **Q2.**, etc.
   const blocks = [];
-  const reBlock = /Q(\d+)\.\s*([\s\S]*?)(?=Q\d+\.\s|$)/g;
+  const reBlock = /\*\*Q(\d+)\.\*\*\s*([\s\S]*?)(?=(\*\*Q\d+\.\*\*)|$)/g;
   let m;
 
   while ((m = reBlock.exec(text)) !== null) {
@@ -95,19 +97,26 @@ function parseQuestions(md) {
     const topic = topicForQuestionNumber(num);
     const blueprintDomain = TOPIC_TO_BLUEPRINT[topic] || "Unmapped";
 
-    const ansMatch = b.body.match(/\bAnswer\s+([A-D])\b/i);
+    // Match **Answer:** B
+    const ansMatch = b.body.match(/\*\*Answer:\*\*\s*([A-D])/i);
     const answer = ansMatch ? ansMatch[1].toUpperCase() : null;
 
-    const optRe = /-\s*([A-D])\s+([\s\S]*?)(?=\s+-\s*[A-D]\s+|\s+Answer\s+[A-D]\b|$)/gi;
+    // Match - A) Option text
+    const optRe = /-\s*([A-D])\)\s+([\s\S]*?)(?=\n-\s*[A-D]\)|\n\*\*Answer:\*\*|$)/g;
     const options = [];
     let om;
 
     while ((om = optRe.exec(b.body)) !== null) {
-      options.push({ letter: om[1].toUpperCase(), text: om[2].trim() });
+      options.push({
+        letter: om[1].toUpperCase(),
+        text: om[2].trim()
+      });
     }
 
-    const firstOptIndex = b.body.search(/-\s*A\s+/i);
-    const questionText = firstOptIndex >= 0 ? b.body.slice(0, firstOptIndex).trim() : b.body.trim();
+    const firstOptIndex = b.body.search(/-\s*A\)\s+/i);
+    const questionText = firstOptIndex >= 0
+      ? b.body.slice(0, firstOptIndex).trim()
+      : b.body.trim();
 
     let explanation = "";
     if (ansMatch) {
@@ -219,9 +228,11 @@ async function startExam() {
     const md = await loadMarkdown();
     QUESTIONS = parseQuestions(md);
 
-    if (QUESTIONS.length < 120) throw new Error("Not enough questions found.");
+    if (QUESTIONS.length !== 120) {
+      throw new Error("Expected 120 questions, but parsed " + QUESTIONS.length + ".");
+    }
 
-    exam = QUESTIONS.slice(0, 120);
+    exam = QUESTIONS;
     idx = 0;
     right = 0;
     locked = {};
@@ -235,6 +246,7 @@ async function startExam() {
     renderQuestion();
   } catch (e) {
     showError(e.message);
+    console.error(e);
   }
 }
 
