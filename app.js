@@ -207,8 +207,6 @@ function buildExamBlueprintWeighted(count) {
   return result;
 }
 
-}
-
 function updateScoreUI() {
   scoreRightEl.textContent = String(right);
   scoreTotalEl.textContent = String(exam.length);
