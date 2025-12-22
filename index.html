@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PAN-NSP Mock Exam</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="title">PAN‑NSP Mock Exam</div>
+      <div class="subtitle">Blueprint-weighted practice</div>
+    </div>
+    <div id="scoreBox" class="scorebox hidden">
+      <div class="scoreline"><span id="scoreRight">0</span>/<span id="scoreTotal">0</span></div>
+      <div class="scorepct" id="scorePct">0%</div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="setupView" class="card">
+      <h1>Create a mock exam</h1>
+
+      <label class="field">
+        <span>Number of questions (1–120)</span>
+        <input id="countInput" type="number" min="1" max="120" value="30" />
+      </label>
+
+      <button id="startBtn" class="primary">Start exam</button>
+
+      <div class="hint">
+        Uses <code>PAN-NSP-Study-Guide.md</code> in the repo root.
+      </div>
+      <div id="setupError" class="error hidden"></div>
+    </section>
+
+    <section id="examView" class="card hidden">
+      <div class="qhead">
+        <div class="qmeta">
+          <div class="qnum">Question <span id="qIndex">1</span> / <span id="qTotal">1</span></div>
+          <div class="qdomain" id="qDomain"></div>
+        </div>
+        <div class="controls">
+          <button id="prevBtn">Prev</button>
+          <button id="nextBtn" class="primary">Next</button>
+        </div>
+      </div>
+
+      <h2 id="qText" class="qtext"></h2>
+      <form id="optionsForm" class="options"></form>
+
+      <div class="actions">
+        <button id="revealBtn" type="button">Show answer & explanation</button>
+      </div>
+
+      <div id="answerBox" class="answerbox hidden">
+        <div><strong>Correct answer:</strong> <span id="correctAnswer"></span></div>
+        <div class="explain" id="explanation"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
