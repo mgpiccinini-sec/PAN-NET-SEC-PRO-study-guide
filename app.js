@@ -1,7 +1,7 @@
 /* ------------------ GLOBALS ------------------ */
 
 const MD_FILE =
-  "https://raw.githubusercontent.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/main/Palo-Alto-Networks-NetSec-Pro-P.md";
+  "https://github.com/mgpiccinini-sec/PAN-NET-SEC-PRO-study-guide/blob/main/Palo%20Alto%20Networks%20NetSec-Pro%20%E2%80%93%20P.md";
 
 const el = (id) => document.getElementById(id);
 
