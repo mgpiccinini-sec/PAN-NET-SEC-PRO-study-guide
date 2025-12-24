@@ -47,14 +47,38 @@ function normalizeDomain(raw) {
   if (s.includes("platform") && (s.includes("services") || s.includes("tools")))
     return "Platform Solutions, Services and Tools";
 
-  if (s.includes("maintenance") || s.includes("configuration") || s.includes("troubleshoot") || s.includes("monitoring"))
+  if (
+    s.includes("maintenance") ||
+    s.includes("configuration") ||
+    s.includes("monitoring") ||
+    s.includes("troubleshoot") ||
+    s.includes("upgrade")
+  ) {
     return "NGFW_SASE Solution Maintenance and Configuration";
+  }
 
-  if (s.includes("infrastructure") || s.includes("cdss") || s.includes("scm") || s.includes("panorama") || s.includes("aiops"))
+  if (
+    s.includes("infrastructure") ||
+    s.includes("cdss") ||
+    s.includes("scm") ||
+    s.includes("panorama") ||
+    s.includes("aiops") ||
+    s.includes("logging service") ||
+    s.includes("sls")
+  ) {
     return "Infrastructure Management and CDSS";
+  }
 
-  if (s.includes("connectivity") || s.includes("vpn") || s.includes("globalprotect") || s.includes("sd-wan") || s.includes("routing"))
+  if (
+    s.includes("connectivity") ||
+    s.includes("vpn") ||
+    s.includes("globalprotect") ||
+    s.includes("sd-wan") ||
+    s.includes("routing") ||
+    s.includes("nat")
+  ) {
     return "Connectivity and Security";
+  }
 
   // last-resort fallback so every question counts into a real bucket
   return "Infrastructure Management and CDSS";
@@ -127,8 +151,8 @@ function updateDomainStatsUI() {
     const row = document.createElement("div");
     row.className = "row";
     row.innerHTML = `
-      <div>${dom}</div>
-      <div>${d.correct}/${d.total} (${pct}%)</div>
+      <div class="dom">${dom}</div>
+      <div class="domScore">${d.correct}/${d.total} (${pct}%)</div>
     `;
     box.appendChild(row);
   });
@@ -174,7 +198,7 @@ function parseQuestions(md) {
     const questionText = block.slice(0, aIdx).trim();
     if (!questionText) continue;
 
-    // Options A-D (tolerant across newlines until next option / answer / separator)
+    // Options A-D
     const optRe =
       /\n([A-D])\.\s+([\s\S]*?)(?=\n[A-D]\.\s+|\n\*\*Correct answer:\*\*|\n\*\*Correct Answer:\*\*|\n---|$)/g;
 
@@ -185,7 +209,7 @@ function parseQuestions(md) {
     }
     if (options.length !== 4) continue;
 
-    // Correct answer
+    // Correct answer: "B" or "A, C"
     const ansMatch = block.match(
       /\*\*Correct\s+answer:\*\*\s*([A-D](?:\s*,\s*[A-D])*)/i
     );
@@ -207,13 +231,8 @@ function parseQuestions(md) {
     const srcMatch = block.match(/\*\*Source:\*\*\s*([\s\S]*?)(?=\n---|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
-    // Extract just the domain portion from Source
-    // Example: "NetSec-Pro syllabus – Network Security Fundamentals (zone-based security)."
-    let domainRaw = "";
-    const domMatch = sourceLine.match(/syllabus\s*–\s*([^(\n.]+)(?:\(|\.|$)/i);
-    if (domMatch) domainRaw = domMatch[1].trim();
-
-    const domain = normalizeDomain(domainRaw);
+    // Domain: map using the full Source line because many of your sources are objectives, not domain names
+    const domain = normalizeDomain(sourceLine);
 
     // Resolve correct texts (for highlight/scoring)
     const correctTexts = answerLetters
