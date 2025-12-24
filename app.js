@@ -1,5 +1,6 @@
 /* ------------------ GLOBALS ------------------ */
 
+// Use same-origin path to avoid CORS on GitHub Pages
 const MD_FILE = "./Palo-Alto-Networks-NetSec-Pro-P.md";
 
 const el = (id) => document.getElementById(id);
@@ -10,13 +11,54 @@ let idx = 0;
 let right = 0;
 
 let locked = {};
-let selected = {}; // selected[q.id] = array of option texts (even for single choice)
+let selected = {}; // selected[q.id] = array of selected option texts (even for single choice)
 let flagged = {};
 let domainStats = {};
 let missedQuestions = [];
 
 let timerInterval = null;
 let secondsElapsed = 0;
+
+/* ------------------ OFFICIAL DOMAINS ------------------ */
+
+const OFFICIAL_DOMAINS = [
+  "Network Security Fundamentals",
+  "NGFW and SASE Solution Functionality",
+  "Platform Solutions, Services and Tools",
+  "NGFW_SASE Solution Maintenance and Configuration",
+  "Infrastructure Management and CDSS",
+  "Connectivity and Security",
+];
+
+function normalizeDomain(raw) {
+  const s = (raw || "").trim().toLowerCase();
+
+  // direct match ignoring case
+  for (const d of OFFICIAL_DOMAINS) {
+    if (s === d.toLowerCase()) return d;
+  }
+
+  // tolerant mapping based on common wording
+  if (s.includes("network security fundamentals")) return "Network Security Fundamentals";
+
+  if (s.includes("ngfw") && s.includes("sase") && s.includes("function"))
+    return "NGFW and SASE Solution Functionality";
+
+  if (s.includes("platform") && (s.includes("services") || s.includes("tools")))
+    return "Platform Solutions, Services and Tools";
+
+  if (s.includes("maintenance") || s.includes("configuration") || s.includes("troubleshoot") || s.includes("monitoring"))
+    return "NGFW_SASE Solution Maintenance and Configuration";
+
+  if (s.includes("infrastructure") || s.includes("cdss") || s.includes("scm") || s.includes("panorama") || s.includes("aiops"))
+    return "Infrastructure Management and CDSS";
+
+  if (s.includes("connectivity") || s.includes("vpn") || s.includes("globalprotect") || s.includes("sd-wan") || s.includes("routing"))
+    return "Connectivity and Security";
+
+  // last-resort fallback so every question counts into a real bucket
+  return "Infrastructure Management and CDSS";
+}
 
 /* ------------------ UTIL ------------------ */
 
@@ -36,28 +78,6 @@ function arraysEqualAsSets(a, b) {
   if (A.size !== B.size) return false;
   for (const x of A) if (!B.has(x)) return false;
   return true;
-}
-
-function normalizeDomain(domain) {
-  // Normalize common variations to keep stats clean
-  const d = (domain || "").trim();
-
-  const map = {
-    "Network Security Fundamentals": "Network Security Fundamentals",
-    "NGFW and SASE solution functionality": "NGFW and SASE solution functionality",
-    "NGFW and SASE Solution Functionality": "NGFW and SASE solution functionality",
-    "NGFW/SASE maintenance and configuration": "Maintenance and Configuration",
-    "NGFW and SASE solution maintenance and configuration": "Maintenance and Configuration",
-    "Maintenance and Configuration": "Maintenance and Configuration",
-    "Infrastructure Management and CDSS": "Infrastructure Management and CDSS",
-    "Infrastructure management and CDSS": "Infrastructure Management and CDSS",
-    "Platform solutions, services, and tools": "Platform solutions, services, and tools",
-    "Platform Solutions, Services, and Tools": "Platform solutions, services, and tools",
-    "Connectivity and Security": "Connectivity and Security",
-    "Connectivity and security": "Connectivity and Security",
-  };
-
-  return map[d] || d || "Unmapped";
 }
 
 /* ------------------ TIMER ------------------ */
@@ -85,22 +105,25 @@ function stopTimer() {
 
 function initDomainStats() {
   domainStats = {};
+  OFFICIAL_DOMAINS.forEach((d) => (domainStats[d] = { total: 0, correct: 0 }));
+
   exam.forEach((q) => {
-    const dom = q.domain || "Unmapped";
+    const dom = q.domain;
     if (!domainStats[dom]) domainStats[dom] = { total: 0, correct: 0 };
     domainStats[dom].total++;
   });
+
   updateDomainStatsUI();
 }
 
 function updateDomainStatsUI() {
   const box = el("domainStatsContent");
-  if (!box) return;
-
   box.innerHTML = "";
-  Object.keys(domainStats).forEach((dom) => {
-    const d = domainStats[dom];
+
+  OFFICIAL_DOMAINS.forEach((dom) => {
+    const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
+
     const row = document.createElement("div");
     row.className = "row";
     row.innerHTML = `
@@ -115,26 +138,24 @@ function updateDomainStatsUI() {
 
 async function loadMarkdown() {
   const res = await fetch(MD_FILE, { cache: "no-store" });
-  if (!res.ok) throw new Error("Could not load markdown file.");
+  if (!res.ok) throw new Error(`Could not load markdown file: ${MD_FILE}`);
   return await res.text();
 }
 
-/* ------------------ PARSE QUESTIONS (NEW TEMPLATE) ------------------ */
+/* ------------------ PARSE QUESTIONS ------------------ */
 /*
-Template:
-## Question 121
-
-[Question text]
-
+Expected template:
+## Question 61
+<text>
 A. ...
 B. ...
 C. ...
 D. ...
-
-**Correct answer:** A, B
+**Correct answer:** B
 **Explanation:** ...
-**Source:** NetSec‑Pro syllabus – <DOMAIN> (topic...)
+**Source:** NetSec-Pro syllabus – Network Security Fundamentals (....)
 ---
+Supports multi: **Correct answer:** A, C
 */
 function parseQuestions(md) {
   const text = md.replace(/\r\n/g, "\n");
@@ -151,10 +172,11 @@ function parseQuestions(md) {
     if (aIdx < 0) continue;
 
     const questionText = block.slice(0, aIdx).trim();
+    if (!questionText) continue;
 
-    // Options A-D
+    // Options A-D (tolerant across newlines until next option / answer / separator)
     const optRe =
-      /\n([A-D])\.\s+([\s\S]*?)(?=\n[A-D]\.\s+|\n\*\*Correct answer:\*\*|\n---|$)/g;
+      /\n([A-D])\.\s+([\s\S]*?)(?=\n[A-D]\.\s+|\n\*\*Correct answer:\*\*|\n\*\*Correct Answer:\*\*|\n---|$)/g;
 
     const options = [];
     let m;
@@ -163,9 +185,9 @@ function parseQuestions(md) {
     }
     if (options.length !== 4) continue;
 
-    // Correct answer: can be "B" or "A, B"
+    // Correct answer
     const ansMatch = block.match(
-      /\*\*Correct answer:\*\*\s*([A-D](?:\s*,\s*[A-D])*)/i
+      /\*\*Correct\s+answer:\*\*\s*([A-D](?:\s*,\s*[A-D])*)/i
     );
     if (!ansMatch) continue;
 
@@ -181,25 +203,25 @@ function parseQuestions(md) {
     );
     const explanation = expMatch ? expMatch[1].trim() : "";
 
-    // Source (optional but expected)
+    // Source (optional)
     const srcMatch = block.match(/\*\*Source:\*\*\s*([\s\S]*?)(?=\n---|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
-    // Domain extraction from Source line:
-    // "NetSec‑Pro syllabus – Network Security Fundamentals (....)"
-    // If the Source line is not in that exact pattern, it will fall back to "Unmapped".
-    let domain = "Unmapped";
+    // Extract just the domain portion from Source
+    // Example: "NetSec-Pro syllabus – Network Security Fundamentals (zone-based security)."
+    let domainRaw = "";
     const domMatch = sourceLine.match(/syllabus\s*–\s*([^(\n.]+)(?:\(|\.|$)/i);
-    if (domMatch) domain = domMatch[1].trim();
-    domain = normalizeDomain(domain);
+    if (domMatch) domainRaw = domMatch[1].trim();
 
-    // Correct texts for scoring and reveal
+    const domain = normalizeDomain(domainRaw);
+
+    // Resolve correct texts (for highlight/scoring)
     const correctTexts = answerLetters
       .map((L) => options.find((o) => o.letter === L))
       .filter(Boolean)
       .map((o) => o.text);
 
-    if (!questionText || correctTexts.length !== answerLetters.length) continue;
+    if (correctTexts.length !== answerLetters.length) continue;
 
     questions.push({
       id: "Q" + num,
@@ -208,8 +230,8 @@ function parseQuestions(md) {
       source: sourceLine,
       text: questionText,
       options,
-      answerLetters, // array
-      correctTexts, // array
+      answerLetters, // array: ["B"] or ["A","C"]
+      correctTexts, // array of texts
       explanation,
     });
   }
@@ -217,17 +239,15 @@ function parseQuestions(md) {
   return questions.sort(() => Math.random() - 0.5);
 }
 
-/* ------------------ NEXT BUTTON ENABLE/DISABLE ------------------ */
+/* ------------------ NEXT BUTTON STATE ------------------ */
 
 function updateNextButtonState() {
   const q = exam[idx];
-  const required = q.answerLetters.length; // 1 for single, >1 for multi
+  const required = q.answerLetters.length; // 1 or >1
   const picked = getPickedArray(q);
 
-  const ok = picked.length === required;
-
-  // Only enable Next if the user picked exactly the required number
-  el("nextBtn").disabled = !ok;
+  // Must select exactly required count
+  el("nextBtn").disabled = picked.length !== required;
 }
 
 /* ------------------ RENDER QUESTION ------------------ */
@@ -241,7 +261,6 @@ function renderQuestion() {
   const required = q.answerLetters.length;
   const isMulti = required > 1;
 
-  // Show domain + guidance
   el("qDomain").textContent = isMulti
     ? `${q.domain} — Select ${required}`
     : q.domain;
@@ -250,8 +269,6 @@ function renderQuestion() {
 
   // Buttons
   el("prevBtn").disabled = idx === 0;
-
-  // Next button text
   el("nextBtn").textContent = idx === exam.length - 1 ? "Finish exam" : "Next";
 
   // Reset answer box
@@ -286,7 +303,6 @@ function renderQuestion() {
     const inputId = q.id + "_" + letter;
 
     // For radio: share same name per question
-    // For checkbox: name can be unique; not critical
     const nameAttr = isMulti ? inputId : q.id;
 
     wrapper.innerHTML = `
@@ -299,7 +315,7 @@ function renderQuestion() {
     const input = wrapper.querySelector("input");
     input.setAttribute("data-text", opt.text);
 
-    // Restore checked state
+    // restore checked
     if (pickedArr.includes(opt.text)) input.checked = true;
 
     input.addEventListener("change", () => {
@@ -310,7 +326,7 @@ function renderQuestion() {
         if (input.checked) current.add(txt);
         else current.delete(txt);
 
-        // Enforce max selections = required
+        // enforce max selections = required
         if (current.size > required) {
           input.checked = false;
           current.delete(txt);
@@ -318,7 +334,6 @@ function renderQuestion() {
 
         setPickedArray(q, Array.from(current));
       } else {
-        // Radio -> single selection array
         setPickedArray(q, [txt]);
       }
 
@@ -328,10 +343,8 @@ function renderQuestion() {
     el("optionsForm").appendChild(wrapper);
   });
 
-  // Next disabled until selection count meets required
   updateNextButtonState();
 
-  // Re-apply answer reveal if user already revealed this question
   if (q._revealed) showAnswer(true);
 }
 
@@ -346,28 +359,19 @@ function showAnswer(noScroll) {
   el("explanation").textContent = q.explanation || "No explanation provided.";
 
   const correctSet = new Set(q.correctTexts);
-  const pickedArr = getPickedArray(q);
-  const pickedSet = new Set(pickedArr);
+  const pickedSet = new Set(getPickedArray(q));
 
   const optDivs = Array.from(el("optionsForm").querySelectorAll(".option"));
   optDivs.forEach((div) => {
     const input = div.querySelector("input");
     const optText = input.getAttribute("data-text");
 
-    if (correctSet.has(optText)) {
-      div.classList.add("correct");
-    }
-
-    if (pickedSet.has(optText) && !correctSet.has(optText)) {
-      div.classList.add("wrong");
-    }
+    if (correctSet.has(optText)) div.classList.add("correct");
+    if (pickedSet.has(optText) && !correctSet.has(optText)) div.classList.add("wrong");
   });
 
   if (!noScroll) {
-    el("answerBox").scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
+    el("answerBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
   }
 }
 
@@ -376,18 +380,13 @@ function showAnswer(noScroll) {
 function scoreCurrentIfNeeded() {
   const q = exam[idx];
 
-  // Safety: if Next is disabled, do nothing
+  // Safety: do not score if incomplete selection
   if (el("nextBtn").disabled) return;
 
   if (locked[q.id]) return;
   locked[q.id] = true;
 
   const pickedArr = getPickedArray(q);
-  const required = q.answerLetters.length;
-
-  // Must pick exactly required number of options
-  if (pickedArr.length !== required) return;
-
   const isCorrect = arraysEqualAsSets(pickedArr, q.correctTexts);
 
   if (isCorrect) {
@@ -428,8 +427,8 @@ function finishExam() {
   const box = el("summaryDomains");
   box.innerHTML = "";
 
-  Object.keys(domainStats).forEach((dom) => {
-    const d = domainStats[dom];
+  OFFICIAL_DOMAINS.forEach((dom) => {
+    const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
     const row = document.createElement("div");
     row.className = "row";
@@ -517,7 +516,7 @@ async function startExam() {
       );
     }
 
-    // Build 60-question exam
+    // Always take 60 random questions from whatever was parsed
     exam = QUESTIONS.slice(0, 60);
 
     idx = 0;
@@ -552,13 +551,10 @@ el("prevBtn").addEventListener("click", () => {
 });
 
 el("nextBtn").addEventListener("click", () => {
-  // Must be answer-complete (Next disabled otherwise)
   if (el("nextBtn").disabled) return;
 
-  // Score before moving forward
   scoreCurrentIfNeeded();
 
-  // Finish if last question
   if (idx === exam.length - 1) {
     finishExam();
     return;
