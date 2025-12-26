@@ -1,5 +1,4 @@
 // ------------------ GLOBALS ------------------
-// Use same-origin path to avoid CORS on GitHub Pages
 const MDFILE = "./Palo-Alto-Networks-NetSec-Pro-P.md";
 const el = (id) => document.getElementById(id);
 
@@ -7,6 +6,7 @@ let QUESTIONS = [];
 let exam = [];
 let idx = 0;
 let right = 0;
+
 let locked = {};
 let selected = {}; // selected[q.id] = array of selected option texts (even for single choice)
 let flagged = {};
@@ -122,17 +122,13 @@ async function loadMarkdown() {
 }
 
 // ------------------ PARSE QUESTIONS ------------------
-// Supports 2 formats found in your file:
-// 1) "--- TITLE ... - Question 80" blocks
-// 2) Optional headings like "Question 61" or "# Question 61" or "## Question 61"
+// Supports your file format:
+// "--- TITLE ... - Question 80" blocks
+// Also supports "Question 61" style headings as fallback.
 function parseQuestions(md) {
   const text = md.replace(/\r/g, "");
 
-  // Split by TITLE blocks first (this matches your actual file)
-  // Example: "--- TITLE Palo Alto Networks NetSec-Pro Practice Exam - Question 80"
   let parts = text.split(/---\s*TITLE[\s\S]*?-\s*Question\s*/g);
-
-  // If TITLE split didn't work (older versions), fallback to "Question N" headings
   if (parts.length < 2) {
     parts = text.split(/\n(?:#{0,6}\s*)?Question\s*/g);
   }
@@ -140,24 +136,21 @@ function parseQuestions(md) {
   const questions = [];
 
   for (let i = 1; i < parts.length; i++) {
-    // parts[i] starts with "<num>..." after split
     const mNum = parts[i].match(/^(\d+)\s*/);
     if (!mNum) continue;
 
     const num = Number(mNum[1]);
     let block = parts[i].slice(mNum[0].length);
 
-    // Sometimes a block may still include next TITLE; clip just in case
+    // clip accidental next TITLE
     block = block.split(/---\s*TITLE[\s\S]*?-\s*Question\s*\d+/)[0];
 
-    // Find options start (A.)
     const aIdx = block.search(/\nA\./);
     if (aIdx < 0) continue;
 
     const questionText = block.slice(0, aIdx).trim();
     if (!questionText) continue;
 
-    // Options A-D
     const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect\s*answer|\nCorrect\s*Answer|\nExplanation|\nSource|\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/g;
     const options = [];
     let mo;
@@ -166,7 +159,6 @@ function parseQuestions(md) {
     }
     if (options.length !== 4) continue;
 
-    // Correct answer (supports "Correct answer B" and "Correct answer: B" and multi "A, C")
     const ansMatch = block.match(/Correct\s*answer\s*:?\s*([A-D](?:\s*,\s*[A-D])*)/i);
     if (!ansMatch) continue;
 
@@ -176,15 +168,12 @@ function parseQuestions(md) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    // Explanation (optional)
     const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:\nSource\s*:|\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/i);
     const explanation = expMatch ? expMatch[1].trim() : "";
 
-    // Source (optional)
     const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
-    // Your file's "Source" is the best domain hint
     const domain = normalizeDomain(sourceLine);
 
     const correctTexts = answerLetters
@@ -448,7 +437,6 @@ async function startExam() {
 
     if (QUESTIONS.length < 60) throw new Error(`Need at least 60 questions, but parsed ${QUESTIONS.length}.`);
 
-    // Always take 60 random questions from whatever was parsed
     exam = QUESTIONS.slice(0, 60);
 
     idx = 0;
