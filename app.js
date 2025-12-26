@@ -144,19 +144,20 @@ function updateDomainStatsUI() {
   const box = el("domainStatsContent");
   box.innerHTML = "";
 
-  OFFICIAL_DOMAINS.forEach((dom) => {
+  OFFICIALDOMAINS.forEach((dom) => {
     const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
 
     const row = document.createElement("div");
     row.className = "row";
     row.innerHTML = `
-      <div class="dom">${dom}</div>
+      <div class="dom" title="${dom}">${dom}</div>
       <div class="domScore">${d.correct}/${d.total} (${pct}%)</div>
     `;
     box.appendChild(row);
   });
 }
+
 
 /* ------------------ LOAD MARKDOWN ------------------ */
 
