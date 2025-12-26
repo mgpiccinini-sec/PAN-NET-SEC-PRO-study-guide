@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <title>PANNSP Mock Exam</title>
-
   <style>
     /* ------------------ GLOBAL DARK THEME ------------------ */
     body {
@@ -46,28 +45,28 @@
     }
     #scoreBox { top: 20px; right: 20px; }
 
-    /* CHANGE #1: move timer to bottom-left */
+    /* CHANGE: timer bottom-left (was top-left) */
     #timerBox { left: 20px; bottom: 20px; top: auto; }
 
     #domainStats { right: 20px; bottom: 20px; width: 320px; font-size: 14px; }
     #domainStats h3 { margin-top: 0; text-align: center; }
 
-    /* CHANGE #2: one-line domain rows */
-    #domainStatsContent .row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      margin: 6px 0;
+    /* CHANGE: one-line rows in domain panel */
+    #domainStatsContent .row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      margin:4px 0;
     }
-    #domainStatsContent .dom {
+    #domainStatsContent .dom{
       flex: 1;
       min-width: 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
-    #domainStatsContent .domScore {
+    #domainStatsContent .domScore{
       flex: 0 0 auto;
       white-space: nowrap;
       color: #bdbdbd;
