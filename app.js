@@ -1,5 +1,4 @@
 /* ------------------ GLOBALS ------------------ */
-
 // Use same-origin path to avoid CORS on GitHub Pages
 const MD_FILE = "./Palo-Alto-Networks-NetSec-Pro-P.md";
 
@@ -9,7 +8,6 @@ let QUESTIONS = [];
 let exam = [];
 let idx = 0;
 let right = 0;
-
 let locked = {};
 let selected = {}; // selected[q.id] = array of selected option texts (even for single choice)
 let flagged = {};
@@ -20,12 +18,11 @@ let timerInterval = null;
 let secondsElapsed = 0;
 
 /* ------------------ OFFICIAL DOMAINS ------------------ */
-
 const OFFICIAL_DOMAINS = [
   "Network Security Fundamentals",
   "NGFW and SASE Solution Functionality",
   "Platform Solutions, Services and Tools",
-  "NGFW_SASE Solution Maintenance and Configuration",
+  "NGFW/SASE Solution Maintenance and Configuration",
   "Infrastructure Management and CDSS",
   "Connectivity and Security",
 ];
@@ -41,11 +38,13 @@ function normalizeDomain(raw) {
   // tolerant mapping based on common wording
   if (s.includes("network security fundamentals")) return "Network Security Fundamentals";
 
-  if (s.includes("ngfw") && s.includes("sase") && s.includes("function"))
+  if (s.includes("ngfw") && s.includes("sase") && s.includes("function")) {
     return "NGFW and SASE Solution Functionality";
+  }
 
-  if (s.includes("platform") && (s.includes("services") || s.includes("tools")))
+  if (s.includes("platform") && (s.includes("services") || s.includes("tools"))) {
     return "Platform Solutions, Services and Tools";
+  }
 
   if (
     s.includes("maintenance") ||
@@ -54,7 +53,7 @@ function normalizeDomain(raw) {
     s.includes("troubleshoot") ||
     s.includes("upgrade")
   ) {
-    return "NGFW_SASE Solution Maintenance and Configuration";
+    return "NGFW/SASE Solution Maintenance and Configuration";
   }
 
   if (
@@ -85,7 +84,6 @@ function normalizeDomain(raw) {
 }
 
 /* ------------------ UTIL ------------------ */
-
 function getPickedArray(q) {
   return Array.isArray(selected[q.id]) ? selected[q.id] : [];
 }
@@ -97,19 +95,22 @@ function setPickedArray(q, arr) {
 function arraysEqualAsSets(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
+
   const A = new Set(a);
   const B = new Set(b);
+
   if (A.size !== B.size) return false;
   for (const x of A) if (!B.has(x)) return false;
+
   return true;
 }
 
 /* ------------------ TIMER ------------------ */
-
 function startTimer() {
   secondsElapsed = 0;
   el("timerBox").classList.remove("hidden");
 
+  if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     secondsElapsed++;
     const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
@@ -126,7 +127,6 @@ function stopTimer() {
 }
 
 /* ------------------ DOMAIN STATS ------------------ */
-
 function initDomainStats() {
   domainStats = {};
   OFFICIAL_DOMAINS.forEach((d) => (domainStats[d] = { total: 0, correct: 0 }));
@@ -144,7 +144,7 @@ function updateDomainStatsUI() {
   const box = el("domainStatsContent");
   box.innerHTML = "";
 
-  OFFICIALDOMAINS.forEach((dom) => {
+  OFFICIAL_DOMAINS.forEach((dom) => {
     const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
 
@@ -158,51 +158,38 @@ function updateDomainStatsUI() {
   });
 }
 
-
 /* ------------------ LOAD MARKDOWN ------------------ */
-
 async function loadMarkdown() {
   const res = await fetch(MD_FILE, { cache: "no-store" });
   if (!res.ok) throw new Error(`Could not load markdown file: ${MD_FILE}`);
   return await res.text();
 }
 
-/* ------------------ PARSE QUESTIONS ------------------ */
-/*
-Expected template:
-## Question 61
-<text>
-A. ...
-B. ...
-C. ...
-D. ...
-**Correct answer:** B
-**Explanation:** ...
-**Source:** NetSec-Pro syllabus – Network Security Fundamentals (....)
----
-Supports multi: **Correct answer:** A, C
+/* ------------------ PARSE QUESTIONS ------------------
+Expected template includes:
+- "## Question <num>"
+- Options "A." "B." "C." "D."
+- "Correct answer <letter>" or "Correct answer A, C"
+- Optional "Explanation"
+- Optional "Source"
 */
 function parseQuestions(md) {
-  const text = md.replace(/\r\n/g, "\n");
+  const text = md.replace(/\r/g, "");
+  const parts = text.split(/##\s*Question\s*/g);
 
-  // Split on "## Question <num>"
-  const parts = text.split(/\n## Question\s+(\d+)\s*\n/g);
   const questions = [];
 
   for (let i = 1; i < parts.length; i += 2) {
     const num = Number(parts[i]);
     const block = parts[i + 1] || "";
 
-    const aIdx = block.search(/\nA\.\s+/);
+    const aIdx = block.search(/\nA\./);
     if (aIdx < 0) continue;
 
     const questionText = block.slice(0, aIdx).trim();
     if (!questionText) continue;
 
-    // Options A-D
-    const optRe =
-      /\n([A-D])\.\s+([\s\S]*?)(?=\n[A-D]\.\s+|\n\*\*Correct answer:\*\*|\n\*\*Correct Answer:\*\*|\n---|$)/g;
-
+    const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect answer|\nCorrect Answer|\n---)/g;
     const options = [];
     let m;
     while ((m = optRe.exec(block)) !== null) {
@@ -210,10 +197,7 @@ function parseQuestions(md) {
     }
     if (options.length !== 4) continue;
 
-    // Correct answer: "B" or "A, C"
-    const ansMatch = block.match(
-      /\*\*Correct\s+answer:\*\*\s*([A-D](?:\s*,\s*[A-D])*)/i
-    );
+    const ansMatch = block.match(/Correct answer\s*([A-D,\s]+)/i);
     if (!ansMatch) continue;
 
     const answerLetters = ansMatch[1]
@@ -222,20 +206,15 @@ function parseQuestions(md) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    // Explanation (optional)
-    const expMatch = block.match(
-      /\*\*Explanation:\*\*\s*([\s\S]*?)(?=\n\*\*Source:\*\*|\n---|$)/i
-    );
+    const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:Source|---)/i);
     const explanation = expMatch ? expMatch[1].trim() : "";
 
-    // Source (optional)
-    const srcMatch = block.match(/\*\*Source:\*\*\s*([\s\S]*?)(?=\n---|$)/i);
+    const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:---|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
-    // Domain: map using the full Source line because many of your sources are objectives, not domain names
     const domain = normalizeDomain(sourceLine);
 
-    // Resolve correct texts (for highlight/scoring)
+    // Resolve correct texts for highlight/scoring
     const correctTexts = answerLetters
       .map((L) => options.find((o) => o.letter === L))
       .filter(Boolean)
@@ -244,34 +223,33 @@ function parseQuestions(md) {
     if (correctTexts.length !== answerLetters.length) continue;
 
     questions.push({
-      id: "Q" + num,
+      id: `Q${num}`,
       num,
       domain,
       source: sourceLine,
       text: questionText,
       options,
-      answerLetters, // array: ["B"] or ["A","C"]
-      correctTexts, // array of texts
+      answerLetters, // array of letters
+      correctTexts, // array of option texts
       explanation,
     });
   }
 
+  // shuffle
   return questions.sort(() => Math.random() - 0.5);
 }
 
 /* ------------------ NEXT BUTTON STATE ------------------ */
-
 function updateNextButtonState() {
   const q = exam[idx];
-  const required = q.answerLetters.length; // 1 or >1
+  const required = q.answerLetters.length;
   const picked = getPickedArray(q);
 
-  // Must select exactly required count
+  // Must select exactly required count (1 for single, N for multi)
   el("nextBtn").disabled = picked.length !== required;
 }
 
 /* ------------------ RENDER QUESTION ------------------ */
-
 function renderQuestion() {
   const q = exam[idx];
 
@@ -281,38 +259,31 @@ function renderQuestion() {
   const required = q.answerLetters.length;
   const isMulti = required > 1;
 
-  el("qDomain").textContent = isMulti
-    ? `${q.domain} — Select ${required}`
-    : q.domain;
-
+  el("qDomain").textContent = isMulti ? `${q.domain} (Select ${required})` : q.domain;
   el("qText").textContent = q.text;
 
-  // Buttons
   el("prevBtn").disabled = idx === 0;
   el("nextBtn").textContent = idx === exam.length - 1 ? "Finish exam" : "Next";
 
-  // Reset answer box
+  // reset answer area
   el("answerBox").classList.add("hidden");
   el("correctAnswer").textContent = "";
   el("explanation").textContent = "";
 
-  // Flag indicator
-  el("flagIndicator").textContent = flagged[q.id] ? "🚩 Flagged" : "";
+  el("flagIndicator").textContent = flagged[q.id] ? "Flagged" : "";
 
-  // Progress bar
+  // progress
   const pct = Math.round(((idx + 1) / exam.length) * 100);
-  el("progressInner").style.width = pct + "%";
+  el("progressInner").style.width = `${pct}%`;
 
-  // Options
+  // options
   el("optionsForm").innerHTML = "";
 
   const pickedArr = getPickedArray(q);
 
-  if (!q._shuffledOptions) {
-    q._shuffledOptions = q.options.slice().sort(() => Math.random() - 0.5);
-  }
+  if (!q.shuffledOptions) q.shuffledOptions = q.options.slice().sort(() => Math.random() - 0.5);
+  const optionsToRender = q.shuffledOptions;
 
-  const optionsToRender = q._shuffledOptions;
   const inputType = isMulti ? "checkbox" : "radio";
 
   optionsToRender.forEach((opt, index) => {
@@ -320,14 +291,14 @@ function renderQuestion() {
     wrapper.className = "option";
 
     const letter = String.fromCharCode(65 + index);
-    const inputId = q.id + "_" + letter;
+    const inputId = `${q.id}_${letter}`;
 
-    // For radio: share same name per question
+    // For radio share same "name" per question
     const nameAttr = isMulti ? inputId : q.id;
 
     wrapper.innerHTML = `
       <label>
-        <input type="${inputType}" name="${nameAttr}" id="${inputId}" />
+        <input type="${inputType}" name="${nameAttr}" id="${inputId}">
         <strong>${letter}.</strong> ${opt.text}
       </label>
     `;
@@ -335,7 +306,6 @@ function renderQuestion() {
     const input = wrapper.querySelector("input");
     input.setAttribute("data-text", opt.text);
 
-    // restore checked
     if (pickedArr.includes(opt.text)) input.checked = true;
 
     input.addEventListener("change", () => {
@@ -346,7 +316,7 @@ function renderQuestion() {
         if (input.checked) current.add(txt);
         else current.delete(txt);
 
-        // enforce max selections = required
+        // enforce max selections
         if (current.size > required) {
           input.checked = false;
           current.delete(txt);
@@ -365,17 +335,16 @@ function renderQuestion() {
 
   updateNextButtonState();
 
-  if (q._revealed) showAnswer(true);
+  if (q.revealed) showAnswer(true);
 }
 
 /* ------------------ SHOW ANSWER ------------------ */
-
 function showAnswer(noScroll) {
   const q = exam[idx];
-  q._revealed = true;
+  q.revealed = true;
 
   el("answerBox").classList.remove("hidden");
-  el("correctAnswer").textContent = q.correctTexts.join(" | ");
+  el("correctAnswer").textContent = q.correctTexts.join(", ");
   el("explanation").textContent = q.explanation || "No explanation provided.";
 
   const correctSet = new Set(q.correctTexts);
@@ -386,21 +355,19 @@ function showAnswer(noScroll) {
     const input = div.querySelector("input");
     const optText = input.getAttribute("data-text");
 
+    div.classList.remove("correct", "wrong");
     if (correctSet.has(optText)) div.classList.add("correct");
     if (pickedSet.has(optText) && !correctSet.has(optText)) div.classList.add("wrong");
   });
 
-  if (!noScroll) {
-    el("answerBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
+  if (!noScroll) el("answerBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 /* ------------------ SCORING ------------------ */
-
 function scoreCurrentIfNeeded() {
   const q = exam[idx];
 
-  // Safety: do not score if incomplete selection
+  // Do not score if incomplete selection
   if (el("nextBtn").disabled) return;
 
   if (locked[q.id]) return;
@@ -409,11 +376,11 @@ function scoreCurrentIfNeeded() {
   const pickedArr = getPickedArray(q);
   const isCorrect = arraysEqualAsSets(pickedArr, q.correctTexts);
 
-  if (isCorrect) {
-    right++;
-    if (domainStats[q.domain]) domainStats[q.domain].correct++;
-  } else {
-    missedQuestions.push(q);
+  if (isCorrect) right++;
+  else missedQuestions.push(q);
+
+  if (domainStats[q.domain] && isCorrect) {
+    domainStats[q.domain].correct++;
   }
 
   updateScoreUI();
@@ -423,26 +390,26 @@ function scoreCurrentIfNeeded() {
 function updateScoreUI() {
   el("scoreRight").textContent = String(right);
   el("scoreTotal").textContent = String(exam.length);
+
   const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
-  el("scorePct").textContent = pct + "%";
+  el("scorePct").textContent = `${pct}%`;
 }
 
 /* ------------------ FINISH EXAM ------------------ */
-
 function finishExam() {
   stopTimer();
 
   el("examView").classList.add("hidden");
   el("summaryView").classList.remove("hidden");
 
-  el("sumCorrect").textContent = right;
-  el("sumPct").textContent = Math.round((right / exam.length) * 100) + "%";
+  el("sumCorrect").textContent = String(right);
+  el("sumPct").textContent = String(Math.round((right / exam.length) * 100));
 
   const m = String(Math.floor(secondsElapsed / 60)).padStart(2, "0");
   const s = String(secondsElapsed % 60).padStart(2, "0");
   el("sumTime").textContent = `${m}:${s}`;
 
-  el("sumFlagged").textContent = Object.keys(flagged).length;
+  el("sumFlagged").textContent = String(Object.keys(flagged).length);
 
   const box = el("summaryDomains");
   box.innerHTML = "";
@@ -450,15 +417,18 @@ function finishExam() {
   OFFICIAL_DOMAINS.forEach((dom) => {
     const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
+
     const row = document.createElement("div");
     row.className = "row";
-    row.innerHTML = `<div><strong>${dom}</strong></div><div>${d.correct}/${d.total} (${pct}%)</div>`;
+    row.innerHTML = `
+      <div class="dom"><strong>${dom}</strong></div>
+      <div class="domScore">${d.correct}/${d.total} (${pct}%)</div>
+    `;
     box.appendChild(row);
   });
 }
 
 /* ------------------ REVIEW MISSED QUESTIONS ------------------ */
-
 function showReview() {
   el("summaryView").classList.add("hidden");
   el("reviewView").classList.remove("hidden");
@@ -472,7 +442,7 @@ function showReview() {
     div.innerHTML = `
       <div><strong>${q.id}</strong> — ${q.domain}</div>
       <div style="margin-top:6px;"><strong>Question:</strong> ${q.text}</div>
-      <div style="margin-top:6px;"><strong>Correct Answer:</strong> ${q.correctTexts.join(" | ")}</div>
+      <div style="margin-top:6px;"><strong>Correct Answer:</strong> ${q.correctTexts.join(", ")}</div>
       <div style="margin-top:6px;">${q.explanation || ""}</div>
     `;
     container.appendChild(div);
@@ -480,15 +450,13 @@ function showReview() {
 }
 
 /* ------------------ FLAG QUESTION ------------------ */
-
 function toggleFlag() {
   const q = exam[idx];
   flagged[q.id] = !flagged[q.id];
-  el("flagIndicator").textContent = flagged[q.id] ? "🚩 Flagged" : "";
+  el("flagIndicator").textContent = flagged[q.id] ? "Flagged" : "";
 }
 
 /* ------------------ EXPORT CSV ------------------ */
-
 function exportCSV() {
   let csv = "QuestionID,Domain,Correct,YourAnswer,CorrectAnswer,Flagged\n";
 
@@ -499,41 +467,33 @@ function exportCSV() {
     const isCorrect = arraysEqualAsSets(yourArr, q.correctTexts) ? "Yes" : "No";
     const isFlagged = flagged[q.id] ? "Yes" : "No";
 
-    csv +=
-      `"${q.id}",` +
-      `"${q.domain.replace(/"/g, '""')}",` +
-      `"${isCorrect}",` +
-      `"${your.replace(/"/g, '""')}",` +
-      `"${correct.replace(/"/g, '""')}",` +
-      `"${isFlagged}"\n`;
+    csv += `${q.id},${q.domain.replace(/,/g, " ")},${isCorrect},${your.replace(/,/g, " ")},${correct.replace(/,/g, " ")},${isFlagged}\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = "exam_results.csv";
+  a.download = "exam-results.csv";
   a.click();
+
   URL.revokeObjectURL(url);
 }
 
 /* ------------------ RESTART ------------------ */
-
 function restartExam() {
   location.reload();
 }
 
 /* ------------------ START EXAM ------------------ */
-
 async function startExam() {
   try {
     const md = await loadMarkdown();
     QUESTIONS = parseQuestions(md);
 
     if (QUESTIONS.length < 60) {
-      throw new Error(
-        "Need at least 60 questions, but parsed " + QUESTIONS.length + "."
-      );
+      throw new Error(`Need at least 60 questions, but parsed ${QUESTIONS.length}.`);
     }
 
     // Always take 60 random questions from whatever was parsed
@@ -561,41 +521,39 @@ async function startExam() {
   }
 }
 
-/* ------------------ BUTTONS ------------------ */
+/* ------------------ INIT (DOM READY) ------------------ */
+document.addEventListener("DOMContentLoaded", () => {
+  // Navigation
+  el("prevBtn").addEventListener("click", () => {
+    if (idx <= 0) return;
+    idx--;
+    renderQuestion();
+  });
 
-// Navigation
-el("prevBtn").addEventListener("click", () => {
-  if (idx === 0) return;
-  idx--;
-  renderQuestion();
+  el("nextBtn").addEventListener("click", () => {
+    if (el("nextBtn").disabled) return;
+
+    scoreCurrentIfNeeded();
+
+    if (idx === exam.length - 1) {
+      finishExam();
+      return;
+    }
+
+    idx++;
+    renderQuestion();
+  });
+
+  // Actions
+  el("revealBtn").addEventListener("click", () => showAnswer(false));
+  el("flagBtn").addEventListener("click", toggleFlag);
+  el("reviewBtn").addEventListener("click", showReview);
+  el("restartBtn").addEventListener("click", restartExam);
+  el("restartBtn2").addEventListener("click", restartExam);
+  el("exportCsvBtn").addEventListener("click", exportCSV);
+
+  const restartMainBtn = el("restartMainBtn");
+  if (restartMainBtn) restartMainBtn.addEventListener("click", restartExam);
+
+  startExam();
 });
-
-el("nextBtn").addEventListener("click", () => {
-  if (el("nextBtn").disabled) return;
-
-  scoreCurrentIfNeeded();
-
-  if (idx === exam.length - 1) {
-    finishExam();
-    return;
-  }
-
-  idx++;
-  renderQuestion();
-});
-
-// Actions
-el("revealBtn").addEventListener("click", () => showAnswer(false));
-el("flagBtn").addEventListener("click", toggleFlag);
-el("reviewBtn").addEventListener("click", showReview);
-el("restartBtn").addEventListener("click", restartExam);
-el("restartBtn2").addEventListener("click", restartExam);
-el("exportCsvBtn").addEventListener("click", exportCSV);
-
-// Optional restart button on initial screen (if present in HTML)
-const restartMainBtn = el("restartMainBtn");
-if (restartMainBtn) restartMainBtn.addEventListener("click", restartExam);
-
-/* ------------------ INIT ------------------ */
-
-startExam();
