@@ -1,7 +1,6 @@
-/* ------------------ GLOBALS ------------------ */
+// ------------------ GLOBALS ------------------
 // Use same-origin path to avoid CORS on GitHub Pages
-const MD_FILE = "./Palo-Alto-Networks-NetSec-Pro-P.md";
-
+const MDFILE = "./Palo-Alto-Networks-NetSec-Pro-P.md";
 const el = (id) => document.getElementById(id);
 
 let QUESTIONS = [];
@@ -17,8 +16,8 @@ let missedQuestions = [];
 let timerInterval = null;
 let secondsElapsed = 0;
 
-/* ------------------ OFFICIAL DOMAINS ------------------ */
-const OFFICIAL_DOMAINS = [
+// ------------------ OFFICIAL DOMAINS ------------------
+const OFFICIALDOMAINS = [
   "Network Security Fundamentals",
   "NGFW and SASE Solution Functionality",
   "Platform Solutions, Services and Tools",
@@ -30,82 +29,41 @@ const OFFICIAL_DOMAINS = [
 function normalizeDomain(raw) {
   const s = (raw || "").trim().toLowerCase();
 
-  // direct match ignoring case
-  for (const d of OFFICIAL_DOMAINS) {
+  for (const d of OFFICIALDOMAINS) {
     if (s === d.toLowerCase()) return d;
   }
 
-  // tolerant mapping based on common wording
   if (s.includes("network security fundamentals")) return "Network Security Fundamentals";
-
-  if (s.includes("ngfw") && s.includes("sase") && s.includes("function")) {
-    return "NGFW and SASE Solution Functionality";
-  }
-
-  if (s.includes("platform") && (s.includes("services") || s.includes("tools"))) {
-    return "Platform Solutions, Services and Tools";
-  }
-
-  if (
-    s.includes("maintenance") ||
-    s.includes("configuration") ||
-    s.includes("monitoring") ||
-    s.includes("troubleshoot") ||
-    s.includes("upgrade")
-  ) {
+  if (s.includes("ngfw") && s.includes("sase") && s.includes("function")) return "NGFW and SASE Solution Functionality";
+  if (s.includes("platform") && (s.includes("services") || s.includes("tools"))) return "Platform Solutions, Services and Tools";
+  if (s.includes("maintenance") || s.includes("configuration") || s.includes("monitoring") || s.includes("troubleshoot") || s.includes("upgrade"))
     return "NGFW/SASE Solution Maintenance and Configuration";
-  }
-
-  if (
-    s.includes("infrastructure") ||
-    s.includes("cdss") ||
-    s.includes("scm") ||
-    s.includes("panorama") ||
-    s.includes("aiops") ||
-    s.includes("logging service") ||
-    s.includes("sls")
-  ) {
+  if (s.includes("infrastructure") || s.includes("cdss") || s.includes("scm") || s.includes("panorama") || s.includes("aiops") || s.includes("logging service") || s.includes("sls"))
     return "Infrastructure Management and CDSS";
-  }
-
-  if (
-    s.includes("connectivity") ||
-    s.includes("vpn") ||
-    s.includes("globalprotect") ||
-    s.includes("sd-wan") ||
-    s.includes("routing") ||
-    s.includes("nat")
-  ) {
+  if (s.includes("connectivity") || s.includes("vpn") || s.includes("globalprotect") || s.includes("sd-wan") || s.includes("routing") || s.includes("nat"))
     return "Connectivity and Security";
-  }
 
-  // last-resort fallback so every question counts into a real bucket
   return "Infrastructure Management and CDSS";
 }
 
-/* ------------------ UTIL ------------------ */
+// ------------------ UTIL ------------------
 function getPickedArray(q) {
   return Array.isArray(selected[q.id]) ? selected[q.id] : [];
 }
-
 function setPickedArray(q, arr) {
   selected[q.id] = arr;
 }
-
 function arraysEqualAsSets(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
-
   const A = new Set(a);
   const B = new Set(b);
-
   if (A.size !== B.size) return false;
   for (const x of A) if (!B.has(x)) return false;
-
   return true;
 }
 
-/* ------------------ TIMER ------------------ */
+// ------------------ TIMER ------------------
 function startTimer() {
   secondsElapsed = 0;
   el("timerBox").classList.remove("hidden");
@@ -120,16 +78,14 @@ function startTimer() {
 }
 
 function stopTimer() {
-  if (timerInterval) {
-    clearInterval(timerInterval);
-    timerInterval = null;
-  }
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
 }
 
-/* ------------------ DOMAIN STATS ------------------ */
+// ------------------ DOMAIN STATS ------------------
 function initDomainStats() {
   domainStats = {};
-  OFFICIAL_DOMAINS.forEach((d) => (domainStats[d] = { total: 0, correct: 0 }));
+  OFFICIALDOMAINS.forEach((d) => (domainStats[d] = { total: 0, correct: 0 }));
 
   exam.forEach((q) => {
     const dom = q.domain;
@@ -144,7 +100,7 @@ function updateDomainStatsUI() {
   const box = el("domainStatsContent");
   box.innerHTML = "";
 
-  OFFICIAL_DOMAINS.forEach((dom) => {
+  OFFICIALDOMAINS.forEach((dom) => {
     const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
 
@@ -158,37 +114,43 @@ function updateDomainStatsUI() {
   });
 }
 
-/* ------------------ LOAD MARKDOWN ------------------ */
+// ------------------ LOAD MARKDOWN ------------------
 async function loadMarkdown() {
-  const res = await fetch(MD_FILE, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not load markdown file: ${MD_FILE} (HTTP ${res.status})`);
+  const res = await fetch(MDFILE, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Could not load markdown file: ${MDFILE} (HTTP ${res.status})`);
   return await res.text();
 }
 
-/* ------------------ PARSE QUESTIONS ------------------
-Accepts headings like:
-- "# Question 61"
-- "## Question 61"
-Options:
-- "A. ...", "B. ...", "C. ...", "D. ..."
-Correct answer:
-- "Correct answer: B" or "Correct answer B" or "Correct Answer: B"
-Supports multi-answer:
-- "Correct answer: A, C"
-*/
+// ------------------ PARSE QUESTIONS ------------------
+// Supports 2 formats found in your file:
+// 1) "--- TITLE ... - Question 80" blocks
+// 2) Optional headings like "Question 61" or "# Question 61" or "## Question 61"
 function parseQuestions(md) {
   const text = md.replace(/\r/g, "");
 
-  // Split on "# Question" OR "## Question" etc. (1+ #)
-  const parts = text.split(/\n#{1,6}\s*Question\s*/g);
+  // Split by TITLE blocks first (this matches your actual file)
+  // Example: "--- TITLE Palo Alto Networks NetSec-Pro Practice Exam - Question 80"
+  let parts = text.split(/---\s*TITLE[\s\S]*?-\s*Question\s*/g);
+
+  // If TITLE split didn't work (older versions), fallback to "Question N" headings
+  if (parts.length < 2) {
+    parts = text.split(/\n(?:#{0,6}\s*)?Question\s*/g);
+  }
 
   const questions = [];
 
-  for (let i = 1; i < parts.length; i += 2) {
-    const num = Number(parts[i]);
-    const block = parts[i + 1] || "";
+  for (let i = 1; i < parts.length; i++) {
+    // parts[i] starts with "<num>..." after split
+    const mNum = parts[i].match(/^(\d+)\s*/);
+    if (!mNum) continue;
 
-    // Find options start
+    const num = Number(mNum[1]);
+    let block = parts[i].slice(mNum[0].length);
+
+    // Sometimes a block may still include next TITLE; clip just in case
+    block = block.split(/---\s*TITLE[\s\S]*?-\s*Question\s*\d+/)[0];
+
+    // Find options start (A.)
     const aIdx = block.search(/\nA\./);
     if (aIdx < 0) continue;
 
@@ -196,15 +158,15 @@ function parseQuestions(md) {
     if (!questionText) continue;
 
     // Options A-D
-    const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect answer|\nCorrect Answer|\n---|\n#{1,6}\s*Question\s*|$)/g;
+    const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect\s*answer|\nCorrect\s*Answer|\nExplanation|\nSource|\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/g;
     const options = [];
-    let m;
-    while ((m = optRe.exec(block)) !== null) {
-      options.push({ letter: m[1].toUpperCase(), text: m[2].trim() });
+    let mo;
+    while ((mo = optRe.exec(block)) !== null) {
+      options.push({ letter: mo[1].toUpperCase(), text: mo[2].trim() });
     }
     if (options.length !== 4) continue;
 
-    // Correct answer (with or without colon)
+    // Correct answer (supports "Correct answer B" and "Correct answer: B" and multi "A, C")
     const ansMatch = block.match(/Correct\s*answer\s*:?\s*([A-D](?:\s*,\s*[A-D])*)/i);
     if (!ansMatch) continue;
 
@@ -214,15 +176,17 @@ function parseQuestions(md) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:\nSource\s*:|\n---|\n#{1,6}\s*Question\s*|$)/i);
+    // Explanation (optional)
+    const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:\nSource\s*:|\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/i);
     const explanation = expMatch ? expMatch[1].trim() : "";
 
-    const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:\n---|\n#{1,6}\s*Question\s*|$)/i);
+    // Source (optional)
+    const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:\n---|\n(?:#{0,6}\s*)?Question\s*\d+|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
+    // Your file's "Source" is the best domain hint
     const domain = normalizeDomain(sourceLine);
 
-    // Resolve correct option texts
     const correctTexts = answerLetters
       .map((L) => options.find((o) => o.letter === L))
       .filter(Boolean)
@@ -246,16 +210,15 @@ function parseQuestions(md) {
   return questions.sort(() => Math.random() - 0.5);
 }
 
-/* ------------------ NEXT BUTTON STATE ------------------ */
+// ------------------ NEXT BUTTON STATE ------------------
 function updateNextButtonState() {
   const q = exam[idx];
   const required = q.answerLetters.length;
   const picked = getPickedArray(q);
-
   el("nextBtn").disabled = picked.length !== required;
 }
 
-/* ------------------ RENDER QUESTION ------------------ */
+// ------------------ RENDER QUESTION ------------------
 function renderQuestion() {
   const q = exam[idx];
 
@@ -338,7 +301,7 @@ function renderQuestion() {
   if (q.revealed) showAnswer(true);
 }
 
-/* ------------------ SHOW ANSWER ------------------ */
+// ------------------ SHOW ANSWER ------------------
 function showAnswer(noScroll) {
   const q = exam[idx];
   q.revealed = true;
@@ -363,7 +326,7 @@ function showAnswer(noScroll) {
   if (!noScroll) el("answerBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
-/* ------------------ SCORING ------------------ */
+// ------------------ SCORING ------------------
 function scoreCurrentIfNeeded() {
   const q = exam[idx];
   if (el("nextBtn").disabled) return;
@@ -386,12 +349,11 @@ function scoreCurrentIfNeeded() {
 function updateScoreUI() {
   el("scoreRight").textContent = String(right);
   el("scoreTotal").textContent = String(exam.length);
-
   const pct = exam.length ? Math.round((right / exam.length) * 100) : 0;
   el("scorePct").textContent = `${pct}%`;
 }
 
-/* ------------------ FINISH EXAM ------------------ */
+// ------------------ FINISH EXAM ------------------
 function finishExam() {
   stopTimer();
 
@@ -410,7 +372,7 @@ function finishExam() {
   const box = el("summaryDomains");
   box.innerHTML = "";
 
-  OFFICIAL_DOMAINS.forEach((dom) => {
+  OFFICIALDOMAINS.forEach((dom) => {
     const d = domainStats[dom] || { total: 0, correct: 0 };
     const pct = d.total ? Math.round((d.correct / d.total) * 100) : 0;
 
@@ -424,7 +386,7 @@ function finishExam() {
   });
 }
 
-/* ------------------ REVIEW MISSED QUESTIONS ------------------ */
+// ------------------ REVIEW MISSED QUESTIONS ------------------
 function showReview() {
   el("summaryView").classList.add("hidden");
   el("reviewView").classList.remove("hidden");
@@ -445,53 +407,48 @@ function showReview() {
   });
 }
 
-/* ------------------ FLAG QUESTION ------------------ */
+// ------------------ FLAG QUESTION ------------------
 function toggleFlag() {
   const q = exam[idx];
   flagged[q.id] = !flagged[q.id];
   el("flagIndicator").textContent = flagged[q.id] ? "Flagged" : "";
 }
 
-/* ------------------ EXPORT CSV ------------------ */
+// ------------------ EXPORT CSV ------------------
 function exportCSV() {
   let csv = "QuestionID,Domain,Correct,YourAnswer,CorrectAnswer,Flagged\n";
-
   exam.forEach((q) => {
     const yourArr = getPickedArray(q);
     const your = yourArr.join(" | ");
     const correct = q.correctTexts.join(" | ");
     const isCorrect = arraysEqualAsSets(yourArr, q.correctTexts) ? "Yes" : "No";
     const isFlagged = flagged[q.id] ? "Yes" : "No";
-
     csv += `${q.id},${q.domain.replace(/,/g, " ")},${isCorrect},${your.replace(/,/g, " ")},${correct.replace(/,/g, " ")},${isFlagged}\n`;
   });
 
   const blob = new Blob([csv], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
   a.download = "exam-results.csv";
   a.click();
-
   URL.revokeObjectURL(url);
 }
 
-/* ------------------ RESTART ------------------ */
+// ------------------ RESTART ------------------
 function restartExam() {
   location.reload();
 }
 
-/* ------------------ START EXAM ------------------ */
+// ------------------ START EXAM ------------------
 async function startExam() {
   try {
     const md = await loadMarkdown();
     QUESTIONS = parseQuestions(md);
 
-    if (QUESTIONS.length < 60) {
-      throw new Error(`Need at least 60 questions, but parsed ${QUESTIONS.length}.`);
-    }
+    if (QUESTIONS.length < 60) throw new Error(`Need at least 60 questions, but parsed ${QUESTIONS.length}.`);
 
+    // Always take 60 random questions from whatever was parsed
     exam = QUESTIONS.slice(0, 60);
 
     idx = 0;
@@ -516,7 +473,7 @@ async function startExam() {
   }
 }
 
-/* ------------------ INIT ------------------ */
+// ------------------ INIT ------------------
 document.addEventListener("DOMContentLoaded", () => {
   el("prevBtn").addEventListener("click", () => {
     if (idx <= 0) return;
