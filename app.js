@@ -161,21 +161,26 @@ function updateDomainStatsUI() {
 /* ------------------ LOAD MARKDOWN ------------------ */
 async function loadMarkdown() {
   const res = await fetch(MD_FILE, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Could not load markdown file: ${MD_FILE}`);
+  if (!res.ok) throw new Error(`Could not load markdown file: ${MD_FILE} (HTTP ${res.status})`);
   return await res.text();
 }
 
 /* ------------------ PARSE QUESTIONS ------------------
-Expected template includes:
-- "## Question <num>"
-- Options "A." "B." "C." "D."
-- "Correct answer <letter>" or "Correct answer A, C"
-- Optional "Explanation"
-- Optional "Source"
+Accepts headings like:
+- "# Question 61"
+- "## Question 61"
+Options:
+- "A. ...", "B. ...", "C. ...", "D. ..."
+Correct answer:
+- "Correct answer: B" or "Correct answer B" or "Correct Answer: B"
+Supports multi-answer:
+- "Correct answer: A, C"
 */
 function parseQuestions(md) {
   const text = md.replace(/\r/g, "");
-  const parts = text.split(/##\s*Question\s*/g);
+
+  // Split on "# Question" OR "## Question" etc. (1+ #)
+  const parts = text.split(/\n#{1,6}\s*Question\s*/g);
 
   const questions = [];
 
@@ -183,13 +188,15 @@ function parseQuestions(md) {
     const num = Number(parts[i]);
     const block = parts[i + 1] || "";
 
+    // Find options start
     const aIdx = block.search(/\nA\./);
     if (aIdx < 0) continue;
 
     const questionText = block.slice(0, aIdx).trim();
     if (!questionText) continue;
 
-    const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect answer|\nCorrect Answer|\n---)/g;
+    // Options A-D
+    const optRe = /\n([A-D])\.\s*([\s\S]*?)(?=\n[A-D]\.\s|\nCorrect answer|\nCorrect Answer|\n---|\n#{1,6}\s*Question\s*|$)/g;
     const options = [];
     let m;
     while ((m = optRe.exec(block)) !== null) {
@@ -197,7 +204,8 @@ function parseQuestions(md) {
     }
     if (options.length !== 4) continue;
 
-    const ansMatch = block.match(/Correct answer\s*([A-D,\s]+)/i);
+    // Correct answer (with or without colon)
+    const ansMatch = block.match(/Correct\s*answer\s*:?\s*([A-D](?:\s*,\s*[A-D])*)/i);
     if (!ansMatch) continue;
 
     const answerLetters = ansMatch[1]
@@ -206,15 +214,15 @@ function parseQuestions(md) {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:Source|---)/i);
+    const expMatch = block.match(/Explanation\s*:?([\s\S]*?)(?:\nSource\s*:|\n---|\n#{1,6}\s*Question\s*|$)/i);
     const explanation = expMatch ? expMatch[1].trim() : "";
 
-    const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:---|$)/i);
+    const srcMatch = block.match(/Source\s*:?([\s\S]*?)(?:\n---|\n#{1,6}\s*Question\s*|$)/i);
     const sourceLine = srcMatch ? srcMatch[1].trim() : "";
 
     const domain = normalizeDomain(sourceLine);
 
-    // Resolve correct texts for highlight/scoring
+    // Resolve correct option texts
     const correctTexts = answerLetters
       .map((L) => options.find((o) => o.letter === L))
       .filter(Boolean)
@@ -229,13 +237,12 @@ function parseQuestions(md) {
       source: sourceLine,
       text: questionText,
       options,
-      answerLetters, // array of letters
-      correctTexts, // array of option texts
+      answerLetters,
+      correctTexts,
       explanation,
     });
   }
 
-  // shuffle
   return questions.sort(() => Math.random() - 0.5);
 }
 
@@ -245,7 +252,6 @@ function updateNextButtonState() {
   const required = q.answerLetters.length;
   const picked = getPickedArray(q);
 
-  // Must select exactly required count (1 for single, N for multi)
   el("nextBtn").disabled = picked.length !== required;
 }
 
@@ -265,18 +271,15 @@ function renderQuestion() {
   el("prevBtn").disabled = idx === 0;
   el("nextBtn").textContent = idx === exam.length - 1 ? "Finish exam" : "Next";
 
-  // reset answer area
   el("answerBox").classList.add("hidden");
   el("correctAnswer").textContent = "";
   el("explanation").textContent = "";
 
   el("flagIndicator").textContent = flagged[q.id] ? "Flagged" : "";
 
-  // progress
   const pct = Math.round(((idx + 1) / exam.length) * 100);
   el("progressInner").style.width = `${pct}%`;
 
-  // options
   el("optionsForm").innerHTML = "";
 
   const pickedArr = getPickedArray(q);
@@ -292,8 +295,6 @@ function renderQuestion() {
 
     const letter = String.fromCharCode(65 + index);
     const inputId = `${q.id}_${letter}`;
-
-    // For radio share same "name" per question
     const nameAttr = isMulti ? inputId : q.id;
 
     wrapper.innerHTML = `
@@ -316,7 +317,6 @@ function renderQuestion() {
         if (input.checked) current.add(txt);
         else current.delete(txt);
 
-        // enforce max selections
         if (current.size > required) {
           input.checked = false;
           current.delete(txt);
@@ -366,8 +366,6 @@ function showAnswer(noScroll) {
 /* ------------------ SCORING ------------------ */
 function scoreCurrentIfNeeded() {
   const q = exam[idx];
-
-  // Do not score if incomplete selection
   if (el("nextBtn").disabled) return;
 
   if (locked[q.id]) return;
@@ -379,9 +377,7 @@ function scoreCurrentIfNeeded() {
   if (isCorrect) right++;
   else missedQuestions.push(q);
 
-  if (domainStats[q.domain] && isCorrect) {
-    domainStats[q.domain].correct++;
-  }
+  if (domainStats[q.domain] && isCorrect) domainStats[q.domain].correct++;
 
   updateScoreUI();
   updateDomainStatsUI();
@@ -496,7 +492,6 @@ async function startExam() {
       throw new Error(`Need at least 60 questions, but parsed ${QUESTIONS.length}.`);
     }
 
-    // Always take 60 random questions from whatever was parsed
     exam = QUESTIONS.slice(0, 60);
 
     idx = 0;
@@ -521,9 +516,8 @@ async function startExam() {
   }
 }
 
-/* ------------------ INIT (DOM READY) ------------------ */
+/* ------------------ INIT ------------------ */
 document.addEventListener("DOMContentLoaded", () => {
-  // Navigation
   el("prevBtn").addEventListener("click", () => {
     if (idx <= 0) return;
     idx--;
@@ -544,7 +538,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderQuestion();
   });
 
-  // Actions
   el("revealBtn").addEventListener("click", () => showAnswer(false));
   el("flagBtn").addEventListener("click", toggleFlag);
   el("reviewBtn").addEventListener("click", showReview);
